@@ -34,7 +34,7 @@ async function startServer() {
       : 'http://localhost:5173',
     credentials: true
   }));
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' })); // base64 photos for face recognition
   app.use(express.urlencoded({ extended: true }));
 
   // Setup custom middleware
