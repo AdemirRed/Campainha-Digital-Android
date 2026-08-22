@@ -1,0 +1,151 @@
+import { Request, Response } from 'express';
+import { EventRepository } from '../database/repositories/EventRepository';
+import { EventService } from '../services/EventService';
+import { CreateEventDTO, UpdateEventDTO } from '@shared/types/event';
+import { ApiResponse, PaginatedResponse } from '@shared/types/api';
+
+export class EventController {
+  private eventRepo: EventRepository;
+  private eventService: EventService;
+
+  constructor() {
+    this.eventRepo = new EventRepository();
+    this.eventService = new EventService();
+  }
+
+  async create(req: Request, res: Response): Promise<void> {
+    try {
+      const data: CreateEventDTO = req.body;
+
+      // Validate
+      if (!data.type) {
+        res.status(400).json({
+          success: false,
+          error: 'Event type is required'
+        } as ApiResponse);
+        return;
+      }
+
+      const event = this.eventRepo.create(data);
+
+      // Emit event to EventBus
+      this.eventService.emitEvent(event.type, event);
+
+      res.status(201).json({
+        success: true,
+        data: event
+      } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      } as ApiResponse);
+    }
+  }
+
+  async getAll(req: Request, res: Response): Promise<void> {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 20;
+      const offset = (page - 1) * pageSize;
+
+      const events = this.eventRepo.findAll(pageSize, offset);
+      const total = this.eventRepo.count();
+
+      const response: PaginatedResponse<any> = {
+        items: events,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize)
+      };
+
+      res.json({
+        success: true,
+        data: response
+      } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      } as ApiResponse);
+    }
+  }
+
+  async getById(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id);
+      const event = this.eventRepo.findById(id);
+
+      if (!event) {
+        res.status(404).json({
+          success: false,
+          error: 'Event not found'
+        } as ApiResponse);
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: event
+      } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      } as ApiResponse);
+    }
+  }
+
+  async update(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id);
+      const data: UpdateEventDTO = req.body;
+
+      const event = this.eventRepo.update(id, data);
+
+      if (!event) {
+        res.status(404).json({
+          success: false,
+          error: 'Event not found'
+        } as ApiResponse);
+        return;
+      }
+
+      res.json({
+        success: true,
+        data: event
+      } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      } as ApiResponse);
+    }
+  }
+
+  async delete(req: Request, res: Response): Promise<void> {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = this.eventRepo.delete(id);
+
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          error: 'Event not found'
+        } as ApiResponse);
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: 'Event deleted successfully'
+      } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      } as ApiResponse);
+    }
+  }
+}

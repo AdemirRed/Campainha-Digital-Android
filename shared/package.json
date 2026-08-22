@@ -1,0 +1,12 @@
+{
+  "name": "smart-doorbell-shared",
+  "version": "1.0.0",
+  "description": "Types e constants compartilhados",
+  "main": "index.ts",
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}
