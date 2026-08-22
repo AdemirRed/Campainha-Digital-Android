@@ -126,7 +126,7 @@ export function useFaceRecognition() {
         const detection = await withTimeout<any>(
           () =>
             faceapi
-              .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
+              .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
               .withFaceLandmarks()
               .withFaceDescriptor(),
           DETECTION_TIMEOUT_MS,
@@ -156,7 +156,7 @@ export function useFaceRecognition() {
       const detection = await withTimeout<any>(
         () =>
           faceapi
-            .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
+            .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
             .withFaceLandmarks()
             .withFaceDescriptor(),
         DETECTION_TIMEOUT_MS,

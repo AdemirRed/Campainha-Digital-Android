@@ -201,7 +201,13 @@ export function AdminResidentsPage() {
           Esta pessoa tem acesso ao painel admin
         </label>
 
-        <video ref={videoRef} muted playsInline style={{ width: '100%', maxWidth: '400px', marginBottom: '16px' }} />
+        <video ref={videoRef} muted playsInline style={{ width: '100%', maxWidth: '400px', marginBottom: '8px' }} />
+        {cameraStarted && (
+          <p style={{ color: '#64748b', fontSize: '13px', marginBottom: '16px' }}>
+            Afaste um pouco o celular para o rosto inteiro (testa ao queixo) aparecer no quadro,
+            com boa iluminação.
+          </p>
+        )}
 
         <input
           ref={fileInputRef}
