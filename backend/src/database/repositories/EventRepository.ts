@@ -124,23 +124,3 @@ export class EventRepository {
     };
   }
 }
-    return info.changes > 0;
-  }
-
-  count(): number {
-    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM events');
-    const result = stmt.get() as { count: number };
-    return result.count;
-  }
-
-  private mapRowToEvent(row: any): Event {
-    return {
-      id: row.id,
-      type: row.type,
-      status: row.status,
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
-      created_at: row.created_at,
-      ended_at: row.ended_at
-    };
-  }
-}

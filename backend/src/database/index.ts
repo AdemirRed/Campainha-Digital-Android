@@ -43,7 +43,9 @@ export class Database {
     // Enable WAL mode (sql.js doesn't support this, but we handle persistence differently)
     
     // Run migrations
-    runMigrations(this.db);
+    if (this.db) {
+      runMigrations(this.db);
+    }
     
     // Save initial state
     this.save();

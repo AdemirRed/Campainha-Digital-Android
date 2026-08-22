@@ -9,6 +9,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# Compiled TypeScript in shared (keep only .ts sources)
+shared/**/*.js
+shared/**/*.d.ts
+shared/**/*.map
+
 # Environment variables
 .env
 .env.local
