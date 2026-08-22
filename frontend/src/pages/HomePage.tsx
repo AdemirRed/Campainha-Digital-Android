@@ -49,6 +49,13 @@ export function HomePage() {
             </Button>
           ))}
         </div>
+
+        <div
+          onClick={() => navigate('/admin/residents')}
+          style={{ marginTop: '32px', textAlign: 'center', color: '#334155', fontSize: '14px', cursor: 'pointer' }}
+        >
+          ⚙️ Admin
+        </div>
       </div>
     </div>
   );
