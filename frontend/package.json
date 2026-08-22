@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:termux": "node scripts/build-termux.mjs",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"
   },

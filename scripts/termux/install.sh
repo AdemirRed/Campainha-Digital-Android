@@ -67,7 +67,7 @@ cd ..
 echo ""
 echo "🔨 Compilando frontend..."
 cd frontend
-npm run build
+npm run build:termux
 cd ..
 
 echo ""
