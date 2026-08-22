@@ -11,6 +11,8 @@
     "migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
     "canvas": "^3.2.3",
     "cors": "^2.8.5",
