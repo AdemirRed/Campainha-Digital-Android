@@ -13,7 +13,7 @@ const faceapi = require('@vladmandic/face-api/dist/face-api.node-wasm.js');
 
 (faceapi.env as any).monkeyPatch({ Canvas, Image, ImageData });
 
-const MODELS_PATH = path.join(__dirname, '../../models');
+const MODELS_PATH = path.join(__dirname, '../../../../models');
 const MATCH_THRESHOLD = 0.6;
 
 let modelsReadyPromise: Promise<void> | null = null;
