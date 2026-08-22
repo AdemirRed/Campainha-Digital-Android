@@ -93,11 +93,13 @@ export function useFaceRecognition() {
     return null;
   }
 
-  async function captureDescriptor(videoEl: HTMLVideoElement): Promise<number[] | null> {
+  async function captureDescriptor(
+    input: HTMLVideoElement | HTMLImageElement
+  ): Promise<number[] | null> {
     if (!modelsReady) return null;
 
     const detection = await faceapi
-      .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
+      .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
 
