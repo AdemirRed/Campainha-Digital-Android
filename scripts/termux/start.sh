@@ -21,7 +21,7 @@ pkill -f "vite" 2>/dev/null
 # Start backend in background
 echo "🔧 Iniciando backend..."
 cd "$PROJECT_ROOT/backend"
-NODE_ENV=production node dist/index.js > ../logs/backend.log 2>&1 &
+NODE_ENV=production node dist/backend/src/bootstrap.js > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "✓ Backend iniciado (PID: $BACKEND_PID)"
 

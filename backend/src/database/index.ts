@@ -27,8 +27,29 @@ export class Database {
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    // Initialize sql.js
-    const SQL = await initSqlJs();
+    // Initialize sql.js with proper wasm file location
+    const SQL = await initSqlJs({
+      // Locate the wasm file - check multiple locations
+      locateFile: (file) => {
+        // In production (compiled), use dist/wasm/
+        const prodPath = path.join(__dirname, '../../../wasm', file);
+        if (fs.existsSync(prodPath)) {
+          logger.info(`Loading sql.js WASM from: ${prodPath}`);
+          return prodPath;
+        }
+        
+        // In development, use node_modules from workspace root
+        const devPath = path.join(__dirname, '../../../node_modules/sql.js/dist', file);
+        if (fs.existsSync(devPath)) {
+          logger.info(`Loading sql.js WASM from: ${devPath}`);
+          return devPath;
+        }
+        
+        // Fallback to default
+        logger.warn(`WASM file not found, using default path: ${file}`);
+        return file;
+      }
+    });
 
     // Load existing database or create new one
     if (fs.existsSync(this.dbPath)) {
