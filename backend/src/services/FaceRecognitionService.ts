@@ -1,20 +1,43 @@
 import path from 'path';
-import * as faceapi from '@vladmandic/face-api';
 import { Canvas, Image, ImageData, loadImage } from 'canvas';
 import { logger } from '../utils/logger';
 
-// @vladmandic/face-api runs in Node via the `canvas` package standing in
-// for the DOM Canvas/Image/ImageData it expects in a browser.
-(faceapi.env as any).monkeyPatch({ Canvas, Image, ImageData });
+// @vladmandic/face-api's CommonJS entry point (dist/face-api.node.js)
+// requires @tensorflow/tfjs-node, a native binding whose prebuilt download
+// is unreliable. The ESM build (dist/face-api.esm.js) bundles its own
+// pure-JS/WebGL-less tfjs with a working CPU backend instead, so it's
+// loaded here via dynamic import() rather than a static require().
+// TypeScript downlevels `import()` to `require()` when targeting
+// CommonJS, which can't load this genuine ESM file. Going through
+// `Function` forces a real dynamic import at runtime instead.
+const dynamicImport: (specifier: string) => Promise<any> = new Function(
+  'specifier',
+  'return import(specifier)'
+) as any;
+
+let faceapiPromise: Promise<typeof import('@vladmandic/face-api')> | null = null;
+
+function loadFaceApi() {
+  if (!faceapiPromise) {
+    faceapiPromise = (async () => {
+      const mod = await dynamicImport('@vladmandic/face-api/dist/face-api.esm.js');
+      const faceapi = mod as typeof import('@vladmandic/face-api');
+      (faceapi.env as any).monkeyPatch({ Canvas, Image, ImageData });
+      return faceapi;
+    })();
+  }
+  return faceapiPromise;
+}
 
 const MODELS_PATH = path.join(__dirname, '../../models');
 const MATCH_THRESHOLD = 0.6;
 
-let modelsReadyPromise: Promise<void> | null = null;
+let modelsReadyPromise: Promise<typeof import('@vladmandic/face-api')> | null = null;
 
-function ensureModelsLoaded(): Promise<void> {
+function ensureModelsLoaded() {
   if (!modelsReadyPromise) {
     modelsReadyPromise = (async () => {
+      const faceapi = await loadFaceApi();
       await (faceapi.tf as any).setBackend('cpu');
       await (faceapi.tf as any).ready();
       await Promise.all([
@@ -23,6 +46,7 @@ function ensureModelsLoaded(): Promise<void> {
         faceapi.nets.faceRecognitionNet.loadFromDisk(MODELS_PATH),
       ]);
       logger.info('Face recognition models loaded');
+      return faceapi;
     })();
   }
   return modelsReadyPromise;
@@ -35,7 +59,7 @@ function base64ToBuffer(base64Image: string): Buffer {
 }
 
 export async function computeFaceDescriptor(base64Image: string): Promise<number[] | null> {
-  await ensureModelsLoaded();
+  const faceapi = await ensureModelsLoaded();
 
   const buffer = base64ToBuffer(base64Image);
   const image = await loadImage(buffer);
@@ -61,7 +85,11 @@ export interface FaceMatch {
   distance: number;
 }
 
-export function matchDescriptor(descriptor: number[], residents: StoredResident[]): FaceMatch | null {
+export async function matchDescriptor(
+  descriptor: number[],
+  residents: StoredResident[]
+): Promise<FaceMatch | null> {
+  const faceapi = await loadFaceApi();
   let best: FaceMatch | null = null;
 
   for (const resident of residents) {

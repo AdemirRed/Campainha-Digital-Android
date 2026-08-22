@@ -49,7 +49,7 @@ export class FaceController {
       }
 
       const residents = this.residentRepo.findAll();
-      const match = matchDescriptor(descriptor, residents);
+      const match = await matchDescriptor(descriptor, residents);
 
       if (!match) {
         res.json({ success: true, data: null } as ApiResponse);
