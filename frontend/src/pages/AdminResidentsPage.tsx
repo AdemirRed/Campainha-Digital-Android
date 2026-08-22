@@ -24,7 +24,7 @@ export function AdminResidentsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
 
-  const { modelsReady, modelError, captureDescriptor } = useFaceRecognition();
+  const { modelsReady, modelError, residentsError, captureDescriptor } = useFaceRecognition();
 
   // Stop any open camera stream when leaving this page, otherwise it keeps
   // the camera device locked and other pages (StandbyPage) can't open it.
@@ -180,6 +180,12 @@ export function AdminResidentsPage() {
         )}
         {!modelsReady && !modelError && (
           <p style={{ color: '#f59e0b', marginBottom: '16px' }}>Carregando modelos de reconhecimento...</p>
+        )}
+        {residentsError && (
+          <p style={{ color: '#ef4444', marginBottom: '16px' }}>
+            Não foi possível conectar ao servidor ({residentsError}). Você ainda pode capturar fotos,
+            mas o cadastro só será salvo quando o backend estiver acessível.
+          </p>
         )}
 
         <input

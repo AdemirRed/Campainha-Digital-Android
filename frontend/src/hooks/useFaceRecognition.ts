@@ -15,19 +15,33 @@ export interface RecognitionResult {
 export function useFaceRecognition() {
   const [modelsReady, setModelsReady] = useState(false);
   const [modelError, setModelError] = useState<string | null>(null);
+  const [residentsError, setResidentsError] = useState<string | null>(null);
   const residentsRef = useRef<{ resident: Resident; descriptors: Float32Array[] }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadModelsAndResidents() {
+    // Models are required to detect/capture faces at all. Loading the
+    // residents list is a separate concern: it's only needed to *match*
+    // a face against known people, so its failure (e.g. backend
+    // unreachable) must not block enrollment/capture from working.
+    async function loadModels() {
       try {
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
         ]);
+        if (cancelled) return;
+        setModelsReady(true);
+      } catch (err: any) {
+        if (cancelled) return;
+        setModelError(err.message || 'Failed to load face recognition models');
+      }
+    }
 
+    async function loadResidents() {
+      try {
         const residents = await apiService.getResidents();
         if (cancelled) return;
 
@@ -35,14 +49,15 @@ export function useFaceRecognition() {
           resident,
           descriptors: resident.descriptors.map((d) => new Float32Array(d)),
         }));
-
-        setModelsReady(true);
+        setResidentsError(null);
       } catch (err: any) {
-        setModelError(err.message || 'Failed to load face recognition models');
+        if (cancelled) return;
+        setResidentsError(err.message || 'Failed to load residents list');
       }
     }
 
-    loadModelsAndResidents();
+    loadModels();
+    loadResidents();
 
     return () => {
       cancelled = true;
@@ -106,5 +121,5 @@ export function useFaceRecognition() {
     return detection ? Array.from(detection.descriptor) : null;
   }
 
-  return { modelsReady, modelError, tryRecognize, captureDescriptor };
+  return { modelsReady, modelError, residentsError, tryRecognize, captureDescriptor };
 }
