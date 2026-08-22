@@ -42,7 +42,7 @@ async function startServer() {
 
   // Static files (for serving frontend in production)
   if (process.env.NODE_ENV === 'production') {
-    const frontendPath = path.join(__dirname, '../../../frontend/dist');
+    const frontendPath = path.join(__dirname, '../../../../frontend/dist');
     logger.info(`Serving static files from: ${frontendPath}`);
     app.use(express.static(frontendPath));
   }
@@ -62,7 +62,7 @@ async function startServer() {
   // Serve frontend in production
   if (process.env.NODE_ENV === 'production') {
     app.get('*', (req, res) => {
-      const indexPath = path.join(__dirname, '../../../frontend/dist/index.html');
+      const indexPath = path.join(__dirname, '../../../../frontend/dist/index.html');
       res.sendFile(indexPath);
     });
   }
