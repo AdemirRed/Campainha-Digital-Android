@@ -69,6 +69,20 @@ export function runMigrations(db: SqlJsDatabase): void {
         );
         CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue(status);
       `
+    },
+    {
+      name: '005_create_residents_table',
+      sql: `
+        CREATE TABLE IF NOT EXISTS residents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          is_admin INTEGER NOT NULL DEFAULT 0,
+          descriptors TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_residents_is_admin ON residents(is_admin);
+      `
     }
   ];
 

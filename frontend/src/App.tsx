@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import DeliveryPage from './pages/DeliveryPage';
 import DeliveryCodePage from './pages/DeliveryCodePage';
 import StandbyPage from './pages/StandbyPage';
+import AdminResidentsPage from './pages/AdminResidentsPage';
 
 function App() {
   usePreventNavigation();
@@ -15,6 +16,7 @@ function App() {
         <Route path="/home" element={<HomePage />} />
         <Route path="/delivery" element={<DeliveryPage />} />
         <Route path="/delivery/:company" element={<DeliveryCodePage />} />
+        <Route path="/admin/residents" element={<AdminResidentsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

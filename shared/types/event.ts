@@ -9,7 +9,8 @@ export enum EventType {
   RECORDING_FINISHED = 'recording_finished',
   NOTIFICATION_SENT = 'notification_sent',
   MOTION_DETECTED = 'motion_detected',
-  PERSON_LEFT = 'person_left'
+  PERSON_LEFT = 'person_left',
+  RESIDENT_IDENTIFIED = 'resident_identified'
 }
 
 export enum EventStatus {

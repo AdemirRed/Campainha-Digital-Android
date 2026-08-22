@@ -1,8 +1,10 @@
 import { CreateDeliveryDTO, Delivery } from '@shared/types/delivery';
 import { Event, CreateEventDTO } from '@shared/types/event';
+import { Resident, CreateResidentDTO } from '@shared/types/resident';
 import { ApiResponse, PaginatedResponse } from '@shared/types/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -76,6 +78,25 @@ class ApiService {
       body: JSON.stringify({ value }),
       headers: {
         'Authorization': `Bearer ${token}`,
+      },
+    });
+  }
+
+  // Residents
+  async getResidents(): Promise<Resident[]> {
+    return this.request<Resident[]>('/residents', {
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+    });
+  }
+
+  async createResident(resident: CreateResidentDTO): Promise<Resident> {
+    return this.request<Resident>('/residents', {
+      method: 'POST',
+      body: JSON.stringify(resident),
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
       },
     });
   }
