@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import * as faceapi from 'face-api.js';
+import * as faceapi from '@vladmandic/face-api';
 import { apiService } from '../services/apiService';
 import { Resident } from '@shared/types/resident';
 
@@ -27,6 +27,11 @@ export function useFaceRecognition() {
     // unreachable) must not block enrollment/capture from working.
     async function loadModels() {
       try {
+        // @vladmandic/face-api bundles both a WebGL and a CPU tfjs backend.
+        // Unlike the original face-api.js (WebGL-only), it auto-selects a
+        // working backend on its own, so devices without WebGL (disabled
+        // hardware acceleration, some WebViews) still fall back to CPU
+        // instead of crashing.
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
@@ -92,14 +97,18 @@ export function useFaceRecognition() {
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
-      const detection = await faceapi
-        .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      try {
+        const detection = await faceapi
+          .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
 
-      if (detection) {
-        const match = matchDescriptor(detection.descriptor);
-        if (match) return match;
+        if (detection) {
+          const match = matchDescriptor(detection.descriptor);
+          if (match) return match;
+        }
+      } catch (err) {
+        console.error('Face detection error:', err);
       }
 
       await new Promise((resolve) => setTimeout(resolve, DETECT_INTERVAL_MS));
@@ -113,12 +122,17 @@ export function useFaceRecognition() {
   ): Promise<number[] | null> {
     if (!modelsReady) return null;
 
-    const detection = await faceapi
-      .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+    try {
+      const detection = await faceapi
+        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
 
-    return detection ? Array.from(detection.descriptor) : null;
+      return detection ? Array.from(detection.descriptor) : null;
+    } catch (err) {
+      console.error('Face capture error:', err);
+      return null;
+    }
   }
 
   return { modelsReady, modelError, residentsError, tryRecognize, captureDescriptor };
