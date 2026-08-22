@@ -9,37 +9,67 @@ export class SettingsRepository {
   }
 
   get(key: string): string | null {
-    const stmt = this.db.prepare('SELECT value FROM settings WHERE key = ?');
-    const row = stmt.get(key) as { value: string } | undefined;
-    return row?.value || null;
+    const result = this.db.exec('SELECT value FROM settings WHERE key = ?', [key]);
+    
+    if (!result || result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
+    
+    return result[0].values[0][0] as string;
   }
 
   set(key: string, value: string): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO settings (key, value, updated_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
-      ON CONFLICT(key) DO UPDATE SET 
-        value = excluded.value,
-        updated_at = CURRENT_TIMESTAMP
-    `);
+    // UPSERT pattern for sql.js (no ON CONFLICT support)
+    const existing = this.get(key);
 
-    stmt.run(key, value);
+    if (existing) {
+      this.db.run(`
+        UPDATE settings 
+        SET value = ?, updated_at = CURRENT_TIMESTAMP 
+        WHERE key = ?
+      `, [value, key]);
+    } else {
+      this.db.run(`
+        INSERT INTO settings (key, value) 
+        VALUES (?, ?)
+      `, [key, value]);
+    }
+
+    Database.getInstance().save();
   }
 
   getAll(): Setting[] {
-    const stmt = this.db.prepare('SELECT * FROM settings');
-    const rows = stmt.all() as any[];
+    const result = this.db.exec('SELECT * FROM settings ORDER BY key');
+
+    if (!result || result.length === 0) {
+      return [];
+    }
+
+    const row = result[0];
+    const settings: Setting[] = [];
     
-    return rows.map(row => ({
-      key: row.key,
-      value: row.value,
-      updated_at: row.updated_at
-    }));
+    for (let i = 0; i < row.values.length; i++) {
+      const columns = row.columns;
+      const values = row.values[i];
+      
+      const setting: any = {};
+      columns.forEach((col: string, j: number) => {
+        setting[col] = values[j];
+      });
+      
+      settings.push({
+        key: setting.key,
+        value: setting.value,
+        updated_at: setting.updated_at
+      });
+    }
+
+    return settings;
   }
 
   delete(key: string): boolean {
-    const stmt = this.db.prepare('DELETE FROM settings WHERE key = ?');
-    const info = stmt.run(key);
-    return info.changes > 0;
+    this.db.run('DELETE FROM settings WHERE key = ?', [key]);
+    Database.getInstance().save();
+    return true;
   }
 }

@@ -1,5 +1,5 @@
-import { Database } from '.';
-import { Event, CreateEventDTO, UpdateEventDTO, EventStatus } from '@shared/types/event';
+import { Database } from '..';
+import { Event, CreateEventDTO, UpdateEventDTO } from '@shared/types/event';
 
 export class EventRepository {
   private db;
@@ -9,37 +9,54 @@ export class EventRepository {
   }
 
   create(data: CreateEventDTO): Event {
-    const stmt = this.db.prepare(`
+    this.db.run(`
       INSERT INTO events (type, metadata)
       VALUES (?, ?)
-    `);
-
-    const info = stmt.run(
+    `, [
       data.type,
       data.metadata ? JSON.stringify(data.metadata) : null
-    );
+    ]);
 
-    return this.findById(info.lastInsertRowid as number)!;
+    // Save to disk after insert
+    Database.getInstance().save();
+
+    // Get last insert ID
+    const result = this.db.exec('SELECT last_insert_rowid() as id');
+    const id = result[0].values[0][0] as number;
+
+    return this.findById(id)!;
   }
 
   findById(id: number): Event | null {
-    const stmt = this.db.prepare('SELECT * FROM events WHERE id = ?');
-    const row = stmt.get(id) as any;
+    const result = this.db.exec('SELECT * FROM events WHERE id = ?', [id]);
 
-    if (!row) return null;
+    if (!result || result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
 
-    return this.mapRowToEvent(row);
+    const row = result[0];
+    return this.mapResultToEvent(row, 0);
   }
 
   findAll(limit = 100, offset = 0): Event[] {
-    const stmt = this.db.prepare(`
+    const result = this.db.exec(`
       SELECT * FROM events 
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
-    `);
+    `, [limit, offset]);
 
-    const rows = stmt.all(limit, offset) as any[];
-    return rows.map(row => this.mapRowToEvent(row));
+    if (!result || result.length === 0) {
+      return [];
+    }
+
+    const row = result[0];
+    const events: Event[] = [];
+    
+    for (let i = 0; i < row.values.length; i++) {
+      events.push(this.mapResultToEvent(row, i));
+    }
+
+    return events;
   }
 
   update(id: number, data: UpdateEventDTO): Event | null {
@@ -65,19 +82,48 @@ export class EventRepository {
 
     values.push(id);
 
-    const stmt = this.db.prepare(`
+    this.db.run(`
       UPDATE events 
       SET ${updates.join(', ')} 
       WHERE id = ?
-    `);
+    `, values);
 
-    stmt.run(...values);
+    Database.getInstance().save();
+
     return this.findById(id);
   }
 
   delete(id: number): boolean {
-    const stmt = this.db.prepare('DELETE FROM events WHERE id = ?');
-    const info = stmt.run(id);
+    this.db.run('DELETE FROM events WHERE id = ?', [id]);
+    Database.getInstance().save();
+    return true;
+  }
+
+  count(): number {
+    const result = this.db.exec('SELECT COUNT(*) as count FROM events');
+    if (!result || result.length === 0) return 0;
+    return result[0].values[0][0] as number;
+  }
+
+  private mapResultToEvent(result: any, index: number): Event {
+    const columns = result.columns;
+    const values = result.values[index];
+
+    const event: any = {};
+    columns.forEach((col: string, i: number) => {
+      event[col] = values[i];
+    });
+
+    return {
+      id: event.id,
+      type: event.type,
+      status: event.status,
+      metadata: event.metadata ? JSON.parse(event.metadata) : null,
+      created_at: event.created_at,
+      ended_at: event.ended_at || null
+    };
+  }
+}
     return info.changes > 0;
   }
 

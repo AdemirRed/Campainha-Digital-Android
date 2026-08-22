@@ -1,9 +1,10 @@
-import Database from 'better-sqlite3';
+import { Database as SqlJsDatabase } from 'sql.js';
 import { logger } from '../utils/logger';
+import { Database } from './index';
 
-export function runMigrations(db: Database.Database): void {
+export function runMigrations(db: SqlJsDatabase): void {
   // Create migrations table if not exists
-  db.exec(`
+  db.run(`
     CREATE TABLE IF NOT EXISTS migrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE,
@@ -72,12 +73,27 @@ export function runMigrations(db: Database.Database): void {
   ];
 
   for (const migration of migrations) {
-    const existing = db.prepare('SELECT * FROM migrations WHERE name = ?').get(migration.name);
+    const result = db.exec('SELECT * FROM migrations WHERE name = ?', [migration.name]);
+    const existing = result && result.length > 0 && result[0].values.length > 0;
     
     if (!existing) {
       logger.info(`Running migration: ${migration.name}`);
-      db.exec(migration.sql);
-      db.prepare('INSERT INTO migrations (name) VALUES (?)').run(migration.name);
+      
+      // Split SQL statements and run them one by one
+      const statements = migration.sql
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      
+      for (const statement of statements) {
+        db.run(statement);
+      }
+      
+      db.run('INSERT INTO migrations (name) VALUES (?)', [migration.name]);
+      
+      // Save after each migration
+      Database.getInstance().save();
+      
       logger.info(`Migration completed: ${migration.name}`);
     }
   }

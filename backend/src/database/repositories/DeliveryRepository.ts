@@ -9,64 +9,87 @@ export class DeliveryRepository {
   }
 
   create(data: CreateDeliveryDTO): Delivery {
-    const stmt = this.db.prepare(`
+    this.db.run(`
       INSERT INTO deliveries (event_id, company, tracking_code, notes)
       VALUES (?, ?, ?, ?)
-    `);
-
-    const info = stmt.run(
+    `, [
       data.event_id,
       data.company,
       data.tracking_code || null,
       data.notes || null
-    );
+    ]);
 
-    return this.findById(info.lastInsertRowid as number)!;
+    Database.getInstance().save();
+
+    const result = this.db.exec('SELECT last_insert_rowid() as id');
+    const id = result[0].values[0][0] as number;
+
+    return this.findById(id)!;
   }
 
   findById(id: number): Delivery | null {
-    const stmt = this.db.prepare('SELECT * FROM deliveries WHERE id = ?');
-    const row = stmt.get(id) as any;
+    const result = this.db.exec('SELECT * FROM deliveries WHERE id = ?', [id]);
 
-    if (!row) return null;
+    if (!result || result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
 
-    return this.mapRowToDelivery(row);
+    return this.mapResultToDelivery(result[0], 0);
   }
 
   findByEventId(eventId: number): Delivery | null {
-    const stmt = this.db.prepare('SELECT * FROM deliveries WHERE event_id = ?');
-    const row = stmt.get(eventId) as any;
+    const result = this.db.exec('SELECT * FROM deliveries WHERE event_id = ?', [eventId]);
 
-    if (!row) return null;
+    if (!result || result.length === 0 || result[0].values.length === 0) {
+      return null;
+    }
 
-    return this.mapRowToDelivery(row);
+    return this.mapResultToDelivery(result[0], 0);
   }
 
   findAll(limit = 100, offset = 0): Delivery[] {
-    const stmt = this.db.prepare(`
+    const result = this.db.exec(`
       SELECT * FROM deliveries 
       ORDER BY created_at DESC 
       LIMIT ? OFFSET ?
-    `);
+    `, [limit, offset]);
 
-    const rows = stmt.all(limit, offset) as any[];
-    return rows.map(row => this.mapRowToDelivery(row));
+    if (!result || result.length === 0) {
+      return [];
+    }
+
+    const row = result[0];
+    const deliveries: Delivery[] = [];
+    
+    for (let i = 0; i < row.values.length; i++) {
+      deliveries.push(this.mapResultToDelivery(row, i));
+    }
+
+    return deliveries;
   }
 
   count(): number {
-    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM deliveries');
-    const result = stmt.get() as { count: number };
-    return result.count;
+    const result = this.db.exec('SELECT COUNT(*) as count FROM deliveries');
+    if (!result || result.length === 0) return 0;
+    return result[0].values[0][0] as number;
   }
 
-  private mapRowToDelivery(row: any): Delivery {
+  private mapResultToDelivery(result: any, index: number): Delivery {
+    const columns = result.columns;
+    const values = result.values[index];
+
+    const delivery: any = {};
+    columns.forEach((col: string, i: number) => {
+      delivery[col] = values[i];
+    });
+
     return {
-      id: row.id,
-      event_id: row.event_id,
-      company: row.company,
-      tracking_code: row.tracking_code,
-      notes: row.notes,
-      created_at: row.created_at
+      id: delivery.id,
+      event_id: delivery.event_id,
+      company: delivery.company,
+      tracking_code: delivery.tracking_code,
+      notes: delivery.notes,
+      created_at: delivery.created_at
     };
   }
 }
