@@ -39,6 +39,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Disable minification to avoid Terser issues on Termux
+        inlineWorkboxRuntime: true,
+        sourcemap: false,
         runtimeCaching: [
           {
             urlPattern: /^http:\/\/localhost:3000\/api\/.*/i,
@@ -75,6 +78,9 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    // Use esbuild instead of terser for better Termux compatibility
+    minify: 'esbuild',
+    target: 'esnext'
   }
 });
