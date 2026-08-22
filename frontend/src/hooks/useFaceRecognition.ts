@@ -6,6 +6,19 @@ import { Resident } from '@shared/types/resident';
 const MODEL_URL = '/models';
 const MATCH_THRESHOLD = 0.6;
 const DETECT_INTERVAL_MS = 500;
+const DETECTION_TIMEOUT_MS = 15000;
+
+// face-api.js's detection tasks are thenables but not structurally typed
+// as PromiseLike (their .then() signature differs slightly), so this
+// deliberately accepts `any` rather than fighting that mismatch.
+function withTimeout<T>(getResult: () => any, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    Promise.resolve(getResult()) as Promise<T>,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} demorou demais e foi cancelado`)), ms)
+    ),
+  ]);
+}
 
 export interface RecognitionResult {
   resident: Resident;
@@ -110,10 +123,15 @@ export function useFaceRecognition() {
 
     while (Date.now() - start < timeoutMs) {
       try {
-        const detection = await faceapi
-          .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+        const detection = await withTimeout<any>(
+          () =>
+            faceapi
+              .detectSingleFace(videoEl, new faceapi.TinyFaceDetectorOptions())
+              .withFaceLandmarks()
+              .withFaceDescriptor(),
+          DETECTION_TIMEOUT_MS,
+          'Detecção facial'
+        );
 
         if (detection) {
           const match = matchDescriptor(detection.descriptor);
@@ -135,10 +153,15 @@ export function useFaceRecognition() {
     if (!modelsReady) return null;
 
     try {
-      const detection = await faceapi
-        .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      const detection = await withTimeout<any>(
+        () =>
+          faceapi
+            .detectSingleFace(input, new faceapi.TinyFaceDetectorOptions())
+            .withFaceLandmarks()
+            .withFaceDescriptor(),
+        DETECTION_TIMEOUT_MS,
+        'Captura facial'
+      );
 
       return detection ? Array.from(detection.descriptor) : null;
     } catch (err) {

@@ -216,11 +216,11 @@ export function AdminResidentsPage() {
           {!cameraStarted && <Button onClick={startCamera}>Ligar câmera</Button>}
           {cameraStarted && (
             <Button onClick={captureOne} disabled={capturing || !modelsReady}>
-              Capturar foto ({descriptors.length}/{CAPTURES_NEEDED})
+              {capturing ? 'Analisando rosto...' : `Capturar foto (${descriptors.length}/${CAPTURES_NEEDED})`}
             </Button>
           )}
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={capturing || !modelsReady}>
-            Enviar fotos do dispositivo ({descriptors.length}/{CAPTURES_NEEDED})
+            {capturing ? 'Analisando fotos...' : `Enviar fotos do dispositivo (${descriptors.length}/${CAPTURES_NEEDED})`}
           </Button>
           <Button variant="success" onClick={handleSave} disabled={descriptors.length === 0}>
             Salvar cadastro
