@@ -25,13 +25,25 @@ export function useFaceRecognition() {
     // residents list is a separate concern: it's only needed to *match*
     // a face against known people, so its failure (e.g. backend
     // unreachable) must not block enrollment/capture from working.
+    async function selectBackend() {
+      // The library's automatic fallback tries webgl -> wasm -> cpu, but
+      // the wasm backend needs its .wasm binaries hosted at a specific
+      // path we haven't wired up, so it fails too (falling through to cpu
+      // takes several seconds and prints a wall of console errors). Try
+      // webgl directly, and if it's unavailable, skip straight to cpu.
+      const tf: any = faceapi.tf;
+      try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+      } catch {
+        await tf.setBackend('cpu');
+        await tf.ready();
+      }
+    }
+
     async function loadModels() {
       try {
-        // @vladmandic/face-api bundles both a WebGL and a CPU tfjs backend.
-        // Unlike the original face-api.js (WebGL-only), it auto-selects a
-        // working backend on its own, so devices without WebGL (disabled
-        // hardware acceleration, some WebViews) still fall back to CPU
-        // instead of crashing.
+        await selectBackend();
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
