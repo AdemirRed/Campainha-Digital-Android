@@ -91,8 +91,9 @@ export function StandbyPage() {
     const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
 
     const opening = 'Olá! Não te reconheci. Em que posso ajudar?';
-    speak(opening);
     transcript.push({ role: 'assistant', content: opening });
+    setSubtitle(opening);
+    await speak(opening); // must finish talking before listening, or the mic hears itself
 
     if (!isSpeechRecognitionSupported()) {
       // No mic input available on this browser/device - still leave a
@@ -102,10 +103,13 @@ export function StandbyPage() {
       return;
     }
 
+    const visitorMessages: string[] = [];
+
     for (let turn = 0; turn < MAX_CONVERSATION_TURNS; turn++) {
       const said = await listenOnce();
       if (!said.trim()) break;
 
+      visitorMessages.push(said);
       transcript.push({ role: 'user', content: said });
       setSubtitle(`Visitante: ${said}`);
 
@@ -113,19 +117,15 @@ export function StandbyPage() {
         const reply = await apiService.chatWithAssistant(transcript);
         transcript.push({ role: 'assistant', content: reply });
         setSubtitle(reply);
-        speak(reply);
-        await new Promise((resolve) => setTimeout(resolve, Math.min(6000, reply.length * 90)));
+        await speak(reply);
       } catch {
-        speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
+        await speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
         break;
       }
     }
 
-    if (transcript.some((m) => m.role === 'user')) {
-      const summary = transcript
-        .map((m) => `${m.role === 'user' ? 'Visitante' : 'Assistente'}: ${m.content}`)
-        .join('\n');
-      apiService.sendMessage({ text: summary }).catch(() => {});
+    if (visitorMessages.length > 0) {
+      apiService.sendMessage({ text: visitorMessages.join(' / ') }).catch(() => {});
     }
 
     await uploadUnrecognizedClip();
@@ -231,7 +231,23 @@ export function StandbyPage() {
       style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', cursor: 'pointer' }}
       onClick={() => !welcomeName && navigate('/home')}
     >
-      <video ref={videoRef} muted playsInline style={{ display: 'none' }} />
+      <video
+        ref={videoRef}
+        muted
+        playsInline
+        style={
+          phase === 'dormant'
+            ? { display: 'none' }
+            : {
+                width: '100%',
+                maxWidth: '360px',
+                borderRadius: '16px',
+                marginBottom: '20px',
+                border: '3px solid var(--border)',
+                transform: 'scaleX(-1)', // mirror, like a real mirror/webcam
+              }
+        }
+      />
 
       {welcomeName ? (
         <div style={{ textAlign: 'center' }}>
@@ -244,6 +260,11 @@ export function StandbyPage() {
           <div className="icon mb-24">🤖</div>
           <h1>Assistente virtual</h1>
           {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
+        </div>
+      ) : phase === 'active' ? (
+        <div style={{ textAlign: 'center' }}>
+          <div className="icon mb-24">🔎</div>
+          <p style={{ fontSize: '20px' }}>Reconhecendo... alinhe seu rosto na câmera</p>
         </div>
       ) : (
         <div className="loading">
