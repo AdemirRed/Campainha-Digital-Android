@@ -19,10 +19,14 @@ export class SettingsRepository {
   }
 
   set(key: string, value: string): void {
-    // UPSERT pattern for sql.js (no ON CONFLICT support)
+    // UPSERT pattern for sql.js (no ON CONFLICT support). Must check for
+    // null specifically - an empty string is a real, previously-saved
+    // value, not "no row yet", and `if (existing)` treated it as falsy,
+    // sending it down the INSERT path and hitting settings.key's UNIQUE
+    // constraint on the next save.
     const existing = this.get(key);
 
-    if (existing) {
+    if (existing !== null) {
       this.db.run(`
         UPDATE settings 
         SET value = ?, updated_at = CURRENT_TIMESTAMP 

@@ -23,7 +23,7 @@ function DeleteButton({ onDelete, deleting }: { onDelete: () => void; deleting: 
   );
 }
 
-export function AdminMessagesTab({ showToast }: { showToast: (msg: string) => void }) {
+export function AdminMessagesTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [messages, setMessages] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -52,7 +52,7 @@ export function AdminMessagesTab({ showToast }: { showToast: (msg: string) => vo
       setMessages((prev) => prev.filter((m) => m.id !== event.id));
       showToast('Mensagem removida');
     } catch (err: any) {
-      showToast(err.message || 'Erro ao remover');
+      showToast(err.message || 'Erro ao remover', 'error');
     } finally {
       setDeletingId(null);
     }

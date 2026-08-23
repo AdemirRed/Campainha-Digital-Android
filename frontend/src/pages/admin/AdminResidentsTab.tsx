@@ -6,7 +6,7 @@ import Button from '../../components/Button';
 
 const CAPTURES_NEEDED = 4;
 
-export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => void }) {
+export function AdminResidentsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +50,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
       setResidents((prev) => prev.filter((r) => r.id !== resident.id));
       showToast('Removido com sucesso');
     } catch (err: any) {
-      showToast(err.message || 'Erro ao remover');
+      showToast(err.message || 'Erro ao remover', 'error');
     } finally {
       setDeletingId(null);
     }
@@ -66,7 +66,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
       }
       setCameraStarted(true);
     } catch (err: any) {
-      showToast(`Não foi possível acessar a câmera: ${err.message || err.name || 'erro desconhecido'}`);
+      showToast(`Não foi possível acessar a câmera: ${err.message || err.name || 'erro desconhecido'}`, 'error');
     }
   }
 
@@ -79,7 +79,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
       setDescriptors((prev) => [...prev, descriptor]);
       showToast('Foto capturada!');
     } catch (err: any) {
-      showToast(err.message || 'Nenhum rosto detectado, tente novamente');
+      showToast(err.message || 'Nenhum rosto detectado, tente novamente', 'error');
     } finally {
       setCapturing(false);
     }
@@ -107,7 +107,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
     setCapturing(false);
 
     if (added === 0) {
-      showToast('Nenhum rosto detectado nas fotos enviadas');
+      showToast('Nenhum rosto detectado nas fotos enviadas', 'error');
     } else if (added < files.length) {
       showToast(`${added} de ${files.length} fotos usadas (as demais não tinham rosto detectável)`);
     } else {
@@ -117,11 +117,11 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
 
   async function handleSave() {
     if (!name) {
-      showToast('Nome é obrigatório');
+      showToast('Nome é obrigatório', 'error');
       return;
     }
     if (descriptors.length === 0) {
-      showToast('Capture ou envie ao menos uma foto');
+      showToast('Capture ou envie ao menos uma foto', 'error');
       return;
     }
 
@@ -133,7 +133,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string) => v
       setDescriptors([]);
       loadResidents();
     } catch (err: any) {
-      showToast(err.message || 'Erro ao salvar cadastro');
+      showToast(err.message || 'Erro ao salvar cadastro', 'error');
     }
   }
 

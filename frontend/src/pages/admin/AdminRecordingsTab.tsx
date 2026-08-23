@@ -13,7 +13,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function AdminRecordingsTab({ showToast }: { showToast: (msg: string) => void }) {
+export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string) => 
       setRecordings((prev) => prev.filter((r) => r.filename !== filename));
       showToast('Clipe removido');
     } catch (err: any) {
-      showToast(err.message || 'Erro ao remover');
+      showToast(err.message || 'Erro ao remover', 'error');
     } finally {
       setDeletingFile(null);
     }

@@ -17,7 +17,7 @@ interface Usage {
   totalBytes: number;
 }
 
-export function AdminSettingsTab({ showToast }: { showToast: (msg: string) => void }) {
+export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const navigate = useNavigate();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,7 +43,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string) => vo
       await apiService.setAssistantInstructions(instructions);
       showToast('Instruções salvas!');
     } catch (err: any) {
-      showToast(err.message || 'Erro ao salvar');
+      showToast(err.message || 'Erro ao salvar', 'error');
     } finally {
       setSavingInstructions(false);
     }

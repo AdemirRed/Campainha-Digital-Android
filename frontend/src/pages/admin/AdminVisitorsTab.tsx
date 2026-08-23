@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiService, STORAGE_BASE_URL } from '../../services/apiService';
 import { Event, EventType } from '@shared/types/event';
 
-export function AdminVisitorsTab({ showToast }: { showToast: (msg: string) => void }) {
+export function AdminVisitorsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [visits, setVisits] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -33,7 +33,7 @@ export function AdminVisitorsTab({ showToast }: { showToast: (msg: string) => vo
       setVisits((prev) => prev.filter((v) => v.id !== event.id));
       showToast('Registro removido');
     } catch (err: any) {
-      showToast(err.message || 'Erro ao remover');
+      showToast(err.message || 'Erro ao remover', 'error');
     } finally {
       setDeletingId(null);
     }

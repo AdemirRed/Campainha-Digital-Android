@@ -29,7 +29,11 @@ export function AdminResidentsPage() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('residents');
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setToast({ message, type });
+  }
 
   function handleUnlock() {
     if (pin === ADMIN_PIN) {
@@ -113,14 +117,14 @@ export function AdminResidentsPage() {
       </div>
 
       <div className="container" style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-        {tab === 'residents' && <AdminResidentsTab showToast={setToast} />}
-        {tab === 'messages' && <AdminMessagesTab showToast={setToast} />}
-        {tab === 'visitors' && <AdminVisitorsTab showToast={setToast} />}
-        {tab === 'recordings' && <AdminRecordingsTab showToast={setToast} />}
-        {tab === 'settings' && <AdminSettingsTab showToast={setToast} />}
+        {tab === 'residents' && <AdminResidentsTab showToast={showToast} />}
+        {tab === 'messages' && <AdminMessagesTab showToast={showToast} />}
+        {tab === 'visitors' && <AdminVisitorsTab showToast={showToast} />}
+        {tab === 'recordings' && <AdminRecordingsTab showToast={showToast} />}
+        {tab === 'settings' && <AdminSettingsTab showToast={showToast} />}
       </div>
 
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }
