@@ -33,7 +33,7 @@ export function Tutorial({ onDismiss }: { onDismiss: () => void }) {
 
         <div style={{ textAlign: 'left', fontSize: '17px', lineHeight: 1.6, marginBottom: '24px' }}>
           <p style={{ textAlign: 'left' }}>
-            <strong>🔔 Chamar morador</strong> — liga a câmera, grava e conversa com você por voz
+            <strong>🤖 Falar com assistente</strong> — liga a câmera, grava e conversa com você por voz
             (assistente virtual) enquanto o morador não atende.
           </p>
           <p style={{ textAlign: 'left' }}>

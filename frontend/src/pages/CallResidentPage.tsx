@@ -10,39 +10,72 @@ const MAX_TURNS = 3;
 export function CallResidentPage() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  // The stream bound to the <video> element is video-only and never
+  // mutated after being assigned - on this WebView, adding/removing an
+  // audio track on a stream that's actively displayed corrupts the
+  // preview (it shows a broken-media icon instead of the camera). All
+  // audio for recording flows through a separate stream/recorder that
+  // never touches video.srcObject.
+  const displayStreamRef = useRef<MediaStream | null>(null);
+  const segmentRecorderRef = useRef<MediaRecorder | null>(null);
+  const segmentAudioStreamRef = useRef<MediaStream | null>(null);
+  const allChunksRef = useRef<Blob[]>([]);
   const [subtitle, setSubtitle] = useState('Ligando para o morador...');
   const [done, setDone] = useState(false);
+
+  // Starts a fresh recording segment (its own audio track + the shared
+  // video track), stopping any segment already in progress first.
+  async function startRecordingSegment() {
+    const videoTrack = displayStreamRef.current?.getVideoTracks()[0];
+    if (!videoTrack || typeof MediaRecorder === 'undefined') return;
+
+    try {
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      segmentAudioStreamRef.current = audioStream;
+      const combined = new MediaStream([videoTrack, ...audioStream.getAudioTracks()]);
+
+      const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) allChunksRef.current.push(e.data);
+      };
+      recorder.start();
+      segmentRecorderRef.current = recorder;
+    } catch {
+      // mic unavailable right now - this segment just doesn't get recorded
+    }
+  }
+
+  function stopRecordingSegment(): Promise<void> {
+    return new Promise((resolve) => {
+      const recorder = segmentRecorderRef.current;
+      if (!recorder || recorder.state === 'inactive') {
+        resolve();
+        return;
+      }
+      recorder.onstop = () => resolve();
+      recorder.stop();
+      segmentAudioStreamRef.current?.getTracks().forEach((t) => t.stop());
+      segmentAudioStreamRef.current = null;
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const displayStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          displayStream.getTracks().forEach((t) => t.stop());
           return;
         }
-        streamRef.current = stream;
+        displayStreamRef.current = displayStream;
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+          videoRef.current.srcObject = displayStream;
           await videoRef.current.play();
         }
 
-        chunksRef.current = [];
-        try {
-          const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
-          recorder.ondataavailable = (e) => {
-            if (e.data.size > 0) chunksRef.current.push(e.data);
-          };
-          recorder.start();
-          recorderRef.current = recorder;
-        } catch {
-          recorderRef.current = null;
-        }
+        await startRecordingSegment();
       } catch (err: any) {
         setSubtitle(`Não foi possível acessar a câmera: ${err.message || err.name}`);
       }
@@ -60,25 +93,12 @@ export function CallResidentPage() {
 
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TURNS && !cancelled; turn++) {
-          // Releasing the recording's audio track before listening (and
-          // reacquiring it after) gives SpeechRecognition exclusive mic
-          // access - on this WebView, a MediaRecorder holding the same
-          // track otherwise starves STT of any audio, so it always times
-          // out with nothing heard.
-          const stream = streamRef.current;
-          const audioTrack = stream?.getAudioTracks()[0];
-          audioTrack?.stop();
-          if (audioTrack && stream) stream.removeTrack(audioTrack);
-
+          // Recording and SpeechRecognition can't both hold the mic at
+          // once on this WebView - pause the segment for the listen
+          // window, then start a new one right after.
+          await stopRecordingSegment();
           const said = await listenOnce();
-
-          try {
-            const freshAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const newTrack = freshAudio.getAudioTracks()[0];
-            if (newTrack && stream) stream.addTrack(newTrack);
-          } catch {
-            // mic unavailable right now - recording just stays video-only
-          }
+          await startRecordingSegment();
 
           if (!said.trim()) break;
 
@@ -104,20 +124,14 @@ export function CallResidentPage() {
         apiService.sendMessage({ text: visitorMessages.join(' / ') }).catch(() => {});
       }
 
-      const recorder = recorderRef.current;
-      if (recorder && recorder.state !== 'inactive') {
-        await new Promise<void>((resolve) => {
-          recorder.onstop = () => resolve();
-          recorder.stop();
-        });
-        if (chunksRef.current.length > 0) {
-          const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-          const reader = new FileReader();
-          reader.onload = () => {
-            apiService.recordUnrecognizedVisit(reader.result as string).catch(() => {});
-          };
-          reader.readAsDataURL(blob);
-        }
+      await stopRecordingSegment();
+      if (allChunksRef.current.length > 0) {
+        const blob = new Blob(allChunksRef.current, { type: 'video/webm' });
+        const reader = new FileReader();
+        reader.onload = () => {
+          apiService.recordUnrecognizedVisit(reader.result as string).catch(() => {});
+        };
+        reader.readAsDataURL(blob);
       }
 
       setSubtitle('Obrigado! O morador vai ver seu recado.');
@@ -131,10 +145,11 @@ export function CallResidentPage() {
 
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      if (recorderRef.current && recorderRef.current.state !== 'inactive') {
-        recorderRef.current.onstop = null;
-        recorderRef.current.stop();
+      displayStreamRef.current?.getTracks().forEach((t) => t.stop());
+      segmentAudioStreamRef.current?.getTracks().forEach((t) => t.stop());
+      if (segmentRecorderRef.current && segmentRecorderRef.current.state !== 'inactive') {
+        segmentRecorderRef.current.onstop = null;
+        segmentRecorderRef.current.stop();
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

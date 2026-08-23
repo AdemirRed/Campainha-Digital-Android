@@ -7,7 +7,7 @@ export const DELIVERY_COMPANIES = [
 ] as const;
 
 export const BUTTON_OPTIONS = [
-  { value: 'call', label: 'CHAMAR MORADOR', icon: '🔔' },
+  { value: 'call', label: 'FALAR COM ASSISTENTE', icon: '🤖' },
   { value: 'delivery', label: 'ENTREGA', icon: '📦' },
   { value: 'other', label: 'OUTRO MOTIVO', icon: '💬' }
 ] as const;

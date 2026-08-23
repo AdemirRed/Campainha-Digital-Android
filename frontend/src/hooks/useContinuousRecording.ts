@@ -16,6 +16,7 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
     stoppedRef.current = false;
 
     let currentRecorder: MediaRecorder | null = null;
+    let currentAudioStream: MediaStream | null = null;
     let segmentTimer: ReturnType<typeof setTimeout> | null = null;
 
     function uploadSegment(chunks: Blob[]) {
@@ -30,11 +31,18 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
       reader.readAsDataURL(blob);
     }
 
-    function recordSegment() {
+    async function recordSegment() {
       if (stoppedRef.current) return;
 
-      const stream = videoRef.current?.srcObject as MediaStream | undefined;
-      if (!stream || typeof MediaRecorder === 'undefined') {
+      // The display stream (bound to <video>) stays video-only and is
+      // only ever read here, never mutated - adding/removing tracks on a
+      // stream that's actively shown corrupts the preview on this
+      // WebView. Sound comes from a separate audio-only stream, combined
+      // with just the video track into a new MediaStream for the
+      // recorder to use.
+      const displayStream = videoRef.current?.srcObject as MediaStream | undefined;
+      const videoTrack = displayStream?.getVideoTracks()[0];
+      if (!videoTrack || typeof MediaRecorder === 'undefined') {
         // Camera not ready yet - try again shortly instead of giving up.
         segmentTimer = setTimeout(recordSegment, 2000);
         return;
@@ -43,7 +51,16 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
       const chunks: Blob[] = [];
       let recorder: MediaRecorder;
       try {
-        recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        let combined: MediaStream = new MediaStream([videoTrack]);
+        try {
+          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          currentAudioStream = audioStream;
+          combined = new MediaStream([videoTrack, ...audioStream.getAudioTracks()]);
+        } catch {
+          // mic busy/unavailable - this segment just records video-only
+        }
+        if (stoppedRef.current) return;
+        recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
       } catch {
         return; // unsupported on this device - continuous recording is skipped
       }
@@ -52,6 +69,8 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
         if (e.data.size > 0) chunks.push(e.data);
       };
       recorder.onstop = () => {
+        currentAudioStream?.getTracks().forEach((t) => t.stop());
+        currentAudioStream = null;
         uploadSegment(chunks);
         if (!stoppedRef.current) recordSegment(); // chain the next segment
       };
@@ -72,6 +91,7 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
         currentRecorder.onstop = null; // don't upload a partial segment on teardown
         currentRecorder.stop();
       }
+      currentAudioStream?.getTracks().forEach((t) => t.stop());
     };
   }, [enabled, videoRef]);
 }

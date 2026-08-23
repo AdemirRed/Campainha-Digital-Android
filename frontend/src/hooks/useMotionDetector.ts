@@ -27,10 +27,14 @@ export function useMotionDetector(videoRef: React.RefObject<HTMLVideoElement>, e
 
     async function startCamera() {
       try {
-        // Audio track included so the same stream can be recorded with
-        // sound (visitor conversations, unrecognized-visitor clips)
-        // without opening a second, separate microphone session.
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        // Video only, deliberately. On this WebView, a stream that also
+        // carries audio - and gets its audio track swapped in/out for
+        // recording vs. speech recognition - stops rendering in the
+        // <video> element (shows a broken-media icon instead of the
+        // camera). Recorders that want sound build their own separate
+        // audio track + combine it with this stream's video track,
+        // instead of touching what's bound to the preview.
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;

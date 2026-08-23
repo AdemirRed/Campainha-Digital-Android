@@ -27,7 +27,8 @@ export function StandbyPage() {
   const [subtitle, setSubtitle] = useState<string | null>(null);
   const recognizingRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
-  const recordedChunksRef = useRef<Blob[]>([]);
+  const recordingAudioStreamRef = useRef<MediaStream | null>(null);
+  const allChunksRef = useRef<Blob[]>([]);
   // Set once a recognized resident interrupts an ongoing stranger
   // conversation, so that flow can bail out cleanly instead of saving a
   // pointless message/clip for someone who turned out to be a resident.
@@ -56,73 +57,65 @@ export function StandbyPage() {
   // nobody gets matched, that clip becomes the "unrecognized visitor"
   // record; if someone IS matched, the clip is simply discarded (the
   // resident_identified event is the record of that visit).
-  function startRecording() {
-    const stream = videoRef.current?.srcObject as MediaStream | undefined;
-    if (!stream || typeof MediaRecorder === 'undefined') return;
+  //
+  // The stream bound to <video> (from useMotionDetector) is video-only
+  // and never mutated - on this WebView, adding/removing an audio track
+  // on a stream that's actively displayed corrupts the preview (shows a
+  // broken-media icon instead of the camera). Recording sound means
+  // building a separate audio-only stream and combining it with just the
+  // video track into a new MediaStream, purely for the recorder.
+  async function startRecordingSegment() {
+    const videoTrack = (videoRef.current?.srcObject as MediaStream | undefined)?.getVideoTracks()[0];
+    if (!videoTrack || typeof MediaRecorder === 'undefined') return;
 
-    recordedChunksRef.current = [];
     try {
-      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingAudioStreamRef.current = audioStream;
+      const combined = new MediaStream([videoTrack, ...audioStream.getAudioTracks()]);
+
+      const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+        if (e.data.size > 0) allChunksRef.current.push(e.data);
       };
       recorder.start();
       recorderRef.current = recorder;
     } catch {
-      // MediaRecorder with this mimeType/stream isn't supported on this
-      // device - recognition still works, we just skip the recording.
-      recorderRef.current = null;
+      // mic unavailable right now - this segment just doesn't get recorded
     }
   }
 
-  function stopRecordingAndGetBase64(): Promise<string | null> {
+  function stopRecordingSegment(): Promise<void> {
     return new Promise((resolve) => {
       const recorder = recorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
-        resolve(null);
+        resolve();
         return;
       }
-      recorder.onstop = () => {
-        if (recordedChunksRef.current.length === 0) {
-          resolve(null);
-          return;
-        }
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
-        reader.readAsDataURL(blob);
-      };
+      recorder.onstop = () => resolve();
       recorder.stop();
+      recordingAudioStreamRef.current?.getTracks().forEach((t) => t.stop());
+      recordingAudioStreamRef.current = null;
     });
   }
 
-  // Once the shared stream also carries an audio track (for recording
-  // sound in clips), SpeechRecognition stopped picking anything up -
-  // some Android WebViews only let one consumer at a time actually read
-  // from the microphone hardware, and our own MediaRecorder was holding
-  // it. Releasing the track before listening, then reacquiring a fresh
-  // one afterwards, gives SpeechRecognition exclusive access for that
-  // window; recording just gets a brief silent gap instead, which beats
-  // STT not working at all.
+  function getRecordedBase64(): Promise<string | null> {
+    if (allChunksRef.current.length === 0) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const blob = new Blob(allChunksRef.current, { type: 'video/webm' });
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  // Recording and SpeechRecognition can't both hold the mic at once on
+  // this WebView - pause the segment for the listen window, then start a
+  // fresh one right after.
   async function listenWithMicReleased(): Promise<string> {
-    const stream = videoRef.current?.srcObject as MediaStream | undefined;
-    const audioTrack = stream?.getAudioTracks()[0];
-
-    audioTrack?.stop();
-    if (audioTrack && stream) stream.removeTrack(audioTrack);
-
+    await stopRecordingSegment();
     const said = await listenOnce();
-
-    try {
-      const freshAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const newTrack = freshAudio.getAudioTracks()[0];
-      if (newTrack && stream) stream.addTrack(newTrack);
-    } catch {
-      // mic unavailable right now - recording just stays video-only
-      // until the next segment/attempt manages to reacquire it
-    }
-
+    await startRecordingSegment();
     return said;
   }
 
@@ -137,7 +130,7 @@ export function StandbyPage() {
   // hadn't been matched yet (e.g. the resident walks up while the kiosk
   // is still talking to an earlier, unidentified visitor).
   async function handleRecognized(result: NonNullable<RecognizeResult>) {
-    stopRecordingAndGetBase64(); // discard - recognized visits don't need a clip
+    stopRecordingSegment(); // discard - recognized visits don't need a clip
 
     await apiService.createEvent({
       type: EventType.RESIDENT_IDENTIFIED,
@@ -251,12 +244,14 @@ export function StandbyPage() {
   }
 
   async function uploadUnrecognizedClip() {
-    const videoBase64 = await stopRecordingAndGetBase64();
+    await stopRecordingSegment();
+    const videoBase64 = await getRecordedBase64();
     if (videoBase64) {
       apiService.recordUnrecognizedVisit(videoBase64).catch(() => {
         // best-effort - a failed upload shouldn't block the kiosk flow
       });
     }
+    allChunksRef.current = [];
   }
 
   useEffect(() => {
@@ -264,7 +259,8 @@ export function StandbyPage() {
 
     recognizingRef.current = true;
     let cancelled = false;
-    startRecording();
+    allChunksRef.current = [];
+    startRecordingSegment();
 
     async function recognize() {
       const start = Date.now();
