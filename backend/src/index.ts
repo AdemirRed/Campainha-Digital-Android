@@ -39,6 +39,16 @@ async function startServer() {
 
   // Serve uploaded media (audio messages, visitor recordings) so <audio>/
   // <video> tags in the admin panel can play them directly by URL.
+  // express.static guesses Content-Type from the .webm extension alone,
+  // which resolves to "video/webm" - <audio> elements refuse to play a
+  // resource served with a video MIME type, so the audios subfolder
+  // needs its Content-Type forced to audio/webm explicitly.
+  app.use(
+    '/storage/audios',
+    express.static(process.env.AUDIOS_PATH || './data/storage/audios', {
+      setHeaders: (res) => res.setHeader('Content-Type', 'audio/webm'),
+    })
+  );
   app.use('/storage', express.static(process.env.STORAGE_PATH || './data/storage'));
 
   // Static files (for serving frontend in production)
