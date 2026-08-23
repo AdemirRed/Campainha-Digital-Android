@@ -7,8 +7,8 @@ echo "Pressione Ctrl+C para sair"
 echo "========================================="
 echo ""
 
-if [ -f "$PROJECT_ROOT/logs/backend.log" ]; then
-    tail -f "$PROJECT_ROOT/logs/backend.log"
+if [ -f "$PROJECT_ROOT/logs/frontend.log" ]; then
+    tail -f "$PROJECT_ROOT/logs/frontend.log"
 else
     echo "Nenhum log encontrado ainda"
 fi

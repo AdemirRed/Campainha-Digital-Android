@@ -7,54 +7,53 @@ echo ""
 # Get project root
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
-# Check if backend is running
-if [ -f "$PROJECT_ROOT/.backend.pid" ]; then
-    PID=$(cat "$PROJECT_ROOT/.backend.pid")
-    
+# Check if frontend (this device) is running
+if [ -f "$PROJECT_ROOT/.frontend.pid" ]; then
+    PID=$(cat "$PROJECT_ROOT/.frontend.pid")
+
     if ps -p $PID > /dev/null 2>&1; then
-        echo "✅ Backend: ONLINE (PID: $PID)"
+        echo "✅ Frontend: ONLINE (PID: $PID)"
     else
-        echo "❌ Backend: OFFLINE (PID inválido)"
+        echo "❌ Frontend: OFFLINE (PID inválido)"
     fi
 else
-    echo "❌ Backend: OFFLINE (sem PID)"
+    echo "❌ Frontend: OFFLINE (sem PID)"
 fi
 
-# Check API endpoint
 echo ""
-echo "🔍 Testando API..."
+echo "🔍 Testando frontend local..."
 if command -v curl &> /dev/null; then
-    RESPONSE=$(curl -s http://localhost:3000/health 2>/dev/null)
-    if [ $? -eq 0 ]; then
-        echo "✅ API: RESPONDENDO"
-        echo "   Response: $RESPONSE"
+    if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+        echo "✅ Frontend local: RESPONDENDO"
     else
-        echo "❌ API: SEM RESPOSTA"
+        echo "❌ Frontend local: SEM RESPOSTA"
     fi
 else
     echo "⚠️  curl não instalado. Execute: pkg install curl"
 fi
 
-# Check disk space
 echo ""
-echo "💾 Armazenamento:"
-cd "$PROJECT_ROOT"
-USED=$(du -sh data 2>/dev/null | cut -f1)
-echo "   Dados: ${USED:-0}"
-
-# Check database
-if [ -f "$PROJECT_ROOT/data/doorbell.db" ]; then
-    DB_SIZE=$(du -h "$PROJECT_ROOT/data/doorbell.db" | cut -f1)
-    echo "   Database: $DB_SIZE"
+echo "🔍 Testando backend remoto (VPS)..."
+if [ -f "$PROJECT_ROOT/frontend/.env" ]; then
+    API_URL=$(grep '^VITE_API_URL=' "$PROJECT_ROOT/frontend/.env" | cut -d'=' -f2-)
+    HEALTH_URL="${API_URL%/api}/health"
+    if command -v curl &> /dev/null && [ -n "$API_URL" ]; then
+        RESPONSE=$(curl -s --max-time 5 "$HEALTH_URL" 2>/dev/null)
+        if [ -n "$RESPONSE" ]; then
+            echo "✅ Backend (VPS): RESPONDENDO"
+            echo "   Response: $RESPONSE"
+        else
+            echo "❌ Backend (VPS): SEM RESPOSTA ($HEALTH_URL)"
+        fi
+    fi
 else
-    echo "   Database: não criado"
+    echo "⚠️  frontend/.env não encontrado, não sei qual VPS testar"
 fi
 
-# Check logs
 echo ""
-echo "📝 Últimas 5 linhas do log:"
-if [ -f "$PROJECT_ROOT/logs/backend.log" ]; then
-    tail -n 5 "$PROJECT_ROOT/logs/backend.log"
+echo "📝 Últimas 5 linhas do log local:"
+if [ -f "$PROJECT_ROOT/logs/frontend.log" ]; then
+    tail -n 5 "$PROJECT_ROOT/logs/frontend.log"
 else
     echo "   (sem logs ainda)"
 fi

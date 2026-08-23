@@ -6,21 +6,25 @@ echo "🛑 Parando Campainha Digital..."
 PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 # Read PID file
-if [ -f "$PROJECT_ROOT/.backend.pid" ]; then
-    PID=$(cat "$PROJECT_ROOT/.backend.pid")
-    
+if [ -f "$PROJECT_ROOT/.frontend.pid" ]; then
+    PID=$(cat "$PROJECT_ROOT/.frontend.pid")
+
     if ps -p $PID > /dev/null 2>&1; then
         kill $PID
-        echo "✓ Backend parado (PID: $PID)"
+        echo "✓ Frontend parado (PID: $PID)"
     else
-        echo "⚠️  Backend já estava parado"
+        echo "⚠️  Frontend já estava parado"
     fi
-    
-    rm "$PROJECT_ROOT/.backend.pid"
+
+    rm "$PROJECT_ROOT/.frontend.pid"
 else
     # Fallback: kill by name
-    pkill -f "node.*backend/dist/index.js"
+    pkill -f "vite preview"
     echo "✓ Processos finalizados"
 fi
+
+# Leftover from older versions of this project that ran the backend
+# locally - harmless if nothing matches.
+pkill -f "node.*backend/dist/backend/src/bootstrap.js" 2>/dev/null
 
 echo "✅ Sistema parado"
