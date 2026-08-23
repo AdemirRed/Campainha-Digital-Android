@@ -1,8 +1,18 @@
 import { Request, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { EventRepository } from '../database/repositories/EventRepository';
 import { EventService } from '../services/EventService';
 import { CreateEventDTO, UpdateEventDTO } from '@shared/types/event';
 import { ApiResponse, PaginatedResponse } from '@shared/types/api';
+
+function unlinkIfExists(filePath: string): void {
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {
+    // best-effort cleanup - a stray file isn't worth failing the delete over
+  }
+}
 
 export class EventController {
   private eventRepo: EventRepository;
@@ -127,15 +137,27 @@ export class EventController {
   async delete(req: Request, res: Response): Promise<void> {
     try {
       const id = parseInt(req.params.id);
-      const deleted = this.eventRepo.delete(id);
+      const event = this.eventRepo.findById(id);
 
-      if (!deleted) {
+      if (!event) {
         res.status(404).json({
           success: false,
           error: 'Event not found'
         } as ApiResponse);
         return;
       }
+
+      // An event's metadata may reference an uploaded file (audio message
+      // or unrecognized-visitor clip) - remove it too, otherwise deleting
+      // the event from the admin panel leaves an orphaned file on disk.
+      if (event.metadata?.audioFile) {
+        unlinkIfExists(path.join(process.env.AUDIOS_PATH || './data/storage/audios', event.metadata.audioFile));
+      }
+      if (event.metadata?.videoFile) {
+        unlinkIfExists(path.join(process.env.VIDEOS_PATH || './data/storage/videos', event.metadata.videoFile));
+      }
+
+      this.eventRepo.delete(id);
 
       res.json({
         success: true,

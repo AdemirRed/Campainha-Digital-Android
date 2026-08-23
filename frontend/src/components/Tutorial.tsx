@@ -33,7 +33,8 @@ export function Tutorial({ onDismiss }: { onDismiss: () => void }) {
 
         <div style={{ textAlign: 'left', fontSize: '17px', lineHeight: 1.6, marginBottom: '24px' }}>
           <p style={{ textAlign: 'left' }}>
-            <strong>🔔 Chamar morador</strong> — avisa o morador (recurso completo em breve).
+            <strong>🔔 Chamar morador</strong> — liga a câmera, grava e conversa com você por voz
+            (assistente virtual) enquanto o morador não atende.
           </p>
           <p style={{ textAlign: 'left' }}>
             <strong>📦 Entrega</strong> — escolha a transportadora e informe o código, se tiver.
@@ -43,12 +44,12 @@ export function Tutorial({ onDismiss }: { onDismiss: () => void }) {
           </p>
           <p style={{ textAlign: 'left' }}>
             <strong>👁️ Reconhecimento facial</strong> — a tela de espera reconhece moradores
-            cadastrados automaticamente. Quem não for reconhecido tem a visita gravada e listada
-            no painel admin.
+            cadastrados automaticamente e conversa com quem não reconhece. Toda a área da porta
+            também fica gravada continuamente (últimos 7 dias).
           </p>
           <p style={{ textAlign: 'left' }}>
-            <strong>⚙️ Admin</strong> — cadastra moradores, vê mensagens recebidas e visitantes não
-            reconhecidos.
+            <strong>⚙️ Admin</strong> — cadastra moradores, vê mensagens, visitantes, gravações e
+            uso de armazenamento.
           </p>
           <p style={{ textAlign: 'left' }}>
             <strong>🔔 Notificações</strong> — abra <code>/notifications</code> num segundo

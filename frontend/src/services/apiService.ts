@@ -52,6 +52,10 @@ class ApiService {
     return this.request<Event>(`/events/${id}`);
   }
 
+  async deleteEvent(id: number): Promise<void> {
+    await this.request<void>(`/events/${id}`, { method: 'DELETE' });
+  }
+
   // Deliveries
   async createDelivery(delivery: Partial<CreateDeliveryDTO>): Promise<Delivery> {
     return this.request<Delivery>('/deliveries', {
@@ -169,6 +173,33 @@ class ApiService {
 
   async getAssistantSummary(): Promise<{ text: string; stats: any }> {
     return this.request<{ text: string; stats: any }>('/assistant/summary');
+  }
+
+  // Disk usage breakdown (audios/videos/continuous/photos)
+  async getStorageUsage(): Promise<{
+    audios: { bytes: number; files: number };
+    videos: { bytes: number; files: number };
+    continuous: { bytes: number; files: number };
+    photos: { bytes: number; files: number };
+    totalBytes: number;
+  }> {
+    return this.request('/storage/usage');
+  }
+
+  // 24/7 rolling recording (7-day retention, oldest chunks auto-deleted)
+  async uploadContinuousChunk(videoBase64: string): Promise<{ filename: string }> {
+    return this.request('/recordings', {
+      method: 'POST',
+      body: JSON.stringify({ videoBase64 }),
+    });
+  }
+
+  async getContinuousRecordings(): Promise<{ filename: string; size: number; createdAt: string }[]> {
+    return this.request('/recordings');
+  }
+
+  async deleteContinuousRecording(filename: string): Promise<void> {
+    await this.request<void>(`/recordings/${encodeURIComponent(filename)}`, { method: 'DELETE' });
   }
 }
 

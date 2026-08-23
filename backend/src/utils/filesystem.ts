@@ -7,6 +7,7 @@ const REQUIRED_DIRECTORIES = [
   process.env.PHOTOS_PATH || './data/storage/photos',
   process.env.THUMBNAILS_PATH || './data/storage/thumbnails',
   process.env.AUDIOS_PATH || './data/storage/audios',
+  process.env.CONTINUOUS_PATH || './data/storage/continuous',
   './logs',
   './data'
 ];

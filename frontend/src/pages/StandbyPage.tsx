@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMotionDetector } from '../hooks/useMotionDetector';
+import { useContinuousRecording } from '../hooks/useContinuousRecording';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { speak } from '../utils/speech';
@@ -24,6 +25,7 @@ export function StandbyPage() {
   const recordedChunksRef = useRef<Blob[]>([]);
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
+  useContinuousRecording(videoRef, !cameraError);
 
   useEffect(() => {
     if (cameraError) return;
