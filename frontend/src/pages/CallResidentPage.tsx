@@ -60,7 +60,26 @@ export function CallResidentPage() {
 
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TURNS && !cancelled; turn++) {
+          // Releasing the recording's audio track before listening (and
+          // reacquiring it after) gives SpeechRecognition exclusive mic
+          // access - on this WebView, a MediaRecorder holding the same
+          // track otherwise starves STT of any audio, so it always times
+          // out with nothing heard.
+          const stream = streamRef.current;
+          const audioTrack = stream?.getAudioTracks()[0];
+          audioTrack?.stop();
+          if (audioTrack && stream) stream.removeTrack(audioTrack);
+
           const said = await listenOnce();
+
+          try {
+            const freshAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const newTrack = freshAudio.getAudioTracks()[0];
+            if (newTrack && stream) stream.addTrack(newTrack);
+          } catch {
+            // mic unavailable right now - recording just stays video-only
+          }
+
           if (!said.trim()) break;
 
           visitorMessages.push(said);

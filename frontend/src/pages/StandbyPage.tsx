@@ -97,6 +97,35 @@ export function StandbyPage() {
     });
   }
 
+  // Once the shared stream also carries an audio track (for recording
+  // sound in clips), SpeechRecognition stopped picking anything up -
+  // some Android WebViews only let one consumer at a time actually read
+  // from the microphone hardware, and our own MediaRecorder was holding
+  // it. Releasing the track before listening, then reacquiring a fresh
+  // one afterwards, gives SpeechRecognition exclusive access for that
+  // window; recording just gets a brief silent gap instead, which beats
+  // STT not working at all.
+  async function listenWithMicReleased(): Promise<string> {
+    const stream = videoRef.current?.srcObject as MediaStream | undefined;
+    const audioTrack = stream?.getAudioTracks()[0];
+
+    audioTrack?.stop();
+    if (audioTrack && stream) stream.removeTrack(audioTrack);
+
+    const said = await listenOnce();
+
+    try {
+      const freshAudio = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const newTrack = freshAudio.getAudioTracks()[0];
+      if (newTrack && stream) stream.addTrack(newTrack);
+    } catch {
+      // mic unavailable right now - recording just stays video-only
+      // until the next segment/attempt manages to reacquire it
+    }
+
+    return said;
+  }
+
   function finishVisit() {
     recognizingRef.current = false;
     setSubtitle(null);
@@ -187,7 +216,7 @@ export function StandbyPage() {
         }
       }
 
-      const said = await listenOnce();
+      const said = await listenWithMicReleased();
 
       if (!said.trim()) {
         silentRetries++;
