@@ -3,7 +3,7 @@ import { createEventRouter } from './events';
 import { createDeliveryRouter } from './deliveries';
 import { createSettingsRouter } from './settings';
 import { createResidentsRouter } from './residents';
-import { createFaceRouter } from './face';
+import { logger } from '../utils/logger';
 
 export function setupRoutes(app: Express): void {
   const apiRouter = Router();
@@ -13,7 +13,19 @@ export function setupRoutes(app: Express): void {
   apiRouter.use('/deliveries', createDeliveryRouter());
   apiRouter.use('/settings', createSettingsRouter());
   apiRouter.use('/residents', createResidentsRouter());
-  apiRouter.use('/face', createFaceRouter());
+
+  // Face recognition depends on `canvas` (a native module) and
+  // @vladmandic/face-api, which aren't installed on constrained hosts like
+  // Termux (only the VPS backend needs them). Requiring it lazily, inside
+  // a try/catch, means a host without those packages still serves every
+  // other route instead of crashing on boot.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { createFaceRouter } = require('./face');
+    apiRouter.use('/face', createFaceRouter());
+  } catch (err: any) {
+    logger.warn(`Face recognition routes disabled (dependency missing): ${err.message}`);
+  }
 
   app.use('/api', apiRouter);
 }

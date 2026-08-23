@@ -11,10 +11,6 @@
     "migrate": "tsx src/database/migrate.ts"
   },
   "dependencies": {
-    "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
-    "@vladmandic/face-api": "^1.7.15",
-    "canvas": "^3.2.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
@@ -23,6 +19,12 @@
     "helmet": "^7.1.0",
     "sql.js": "^1.10.3",
     "winston": "^3.11.0"
+  },
+  "optionalDependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
+    "canvas": "^3.2.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
