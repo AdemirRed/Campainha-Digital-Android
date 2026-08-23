@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64, fileToBase64 } from '../utils/imageCapture';
+import { Resident } from '@shared/types/resident';
 import Button from '../components/Button';
 import Toast from '../components/Toast';
 
@@ -25,6 +26,43 @@ export function AdminResidentsPage() {
   const [cameraStarted, setCameraStarted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+
+  const [residents, setResidents] = useState<Resident[]>([]);
+  const [residentsLoading, setResidentsLoading] = useState(false);
+  const [residentsError, setResidentsError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function loadResidents() {
+    setResidentsLoading(true);
+    setResidentsError(null);
+    try {
+      const list = await apiService.getResidents();
+      setResidents(list);
+    } catch (err: any) {
+      setResidentsError(err.message || 'Erro ao carregar cadastrados');
+    } finally {
+      setResidentsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (unlocked) loadResidents();
+  }, [unlocked]);
+
+  async function handleDelete(resident: Resident) {
+    if (!window.confirm(`Remover "${resident.name}" dos cadastrados?`)) return;
+
+    setDeletingId(resident.id);
+    try {
+      await apiService.deleteResident(resident.id);
+      setResidents((prev) => prev.filter((r) => r.id !== resident.id));
+      setToast('Removido com sucesso');
+    } catch (err: any) {
+      setToast(err.message || 'Erro ao remover');
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   // Stop any open camera stream when leaving this page, otherwise it keeps
   // the camera device locked and other pages (StandbyPage) can't open it.
@@ -120,6 +158,7 @@ export function AdminResidentsPage() {
       setName('');
       setIsAdmin(false);
       setDescriptors([]);
+      loadResidents();
     } catch (err: any) {
       setToast(err.message || 'Erro ao salvar cadastro');
     }
@@ -200,6 +239,56 @@ export function AdminResidentsPage() {
           </Button>
           <Button variant="outline" onClick={() => navigate('/')}>Sair</Button>
         </div>
+
+        <h2 className="mt-32 mb-16" style={{ fontSize: '24px' }}>Pessoas cadastradas</h2>
+
+        {residentsLoading && <p>Carregando...</p>}
+        {residentsError && <p style={{ color: '#ef4444' }}>{residentsError}</p>}
+        {!residentsLoading && !residentsError && residents.length === 0 && (
+          <p>Nenhuma pessoa cadastrada ainda.</p>
+        )}
+
+        {residents.map((resident) => (
+          <div
+            key={resident.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              padding: '12px 16px',
+              marginBottom: '10px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+            }}
+          >
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '18px', fontWeight: 600 }}>
+                {resident.name} {resident.is_admin && '👑'}
+              </div>
+              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                {resident.descriptors.length} foto(s) · cadastrado em{' '}
+                {new Date(resident.created_at).toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+            <button
+              onClick={() => handleDelete(resident)}
+              disabled={deletingId === resident.id}
+              style={{
+                background: 'transparent',
+                border: '2px solid var(--error)',
+                color: 'var(--error)',
+                borderRadius: '8px',
+                padding: '8px 14px',
+                fontSize: '18px',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}
+            >
+              {deletingId === resident.id ? '...' : '🗑️'}
+            </button>
+          </div>
+        ))}
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

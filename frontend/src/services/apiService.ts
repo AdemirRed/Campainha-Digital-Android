@@ -106,6 +106,15 @@ class ApiService {
     });
   }
 
+  async deleteResident(id: number): Promise<void> {
+    await this.request<void>(`/residents/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+    });
+  }
+
   // Face recognition (processed server-side)
   async getFaceDescriptor(imageBase64: string): Promise<number[]> {
     const result = await this.request<{ descriptor: number[] }>('/face/descriptor', {
