@@ -136,6 +136,14 @@ class ApiService {
       },
     });
   }
+
+  // Free-text / audio message left by a visitor ("outro motivo")
+  async sendMessage(message: { text?: string; audioBase64?: string }): Promise<Event> {
+    return this.request<Event>('/messages', {
+      method: 'POST',
+      body: JSON.stringify(message),
+    });
+  }
 }
 
 export const apiService = new ApiService();

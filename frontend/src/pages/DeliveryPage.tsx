@@ -11,14 +11,7 @@ export function DeliveryPage() {
   }, 30000);
 
   const handleCompanySelect = (company: string) => {
-    if (company === 'mercadolivre') {
-      navigate(`/delivery/${company}`);
-    } else {
-      // For other companies, just register and return
-      // TODO: Implement tracking code input for other companies
-      alert(`Entrega ${company} registrada!`);
-      setTimeout(() => navigate('/'), 2000);
-    }
+    navigate(`/delivery/${company}`);
   };
 
   return (

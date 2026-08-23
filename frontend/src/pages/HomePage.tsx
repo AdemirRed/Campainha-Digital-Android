@@ -2,8 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInactivityTimer } from '../hooks/useInactivityTimer';
 import { BUTTON_OPTIONS } from '@shared/constants';
-import { apiService } from '../services/apiService';
-import { EventType } from '@shared/types/event';
 import Button from '../components/Button';
 import Toast from '../components/Toast';
 
@@ -16,7 +14,7 @@ export function HomePage() {
     navigate('/');
   }, 30000);
 
-  const handleButtonClick = async (value: string) => {
+  const handleButtonClick = (value: string) => {
     switch (value) {
       case 'call':
         // TODO: Phase 3 - Implement call functionality
@@ -26,13 +24,7 @@ export function HomePage() {
         navigate('/delivery');
         break;
       case 'other':
-        try {
-          await apiService.createEvent({ type: EventType.BUTTON_PRESSED, metadata: { reason: 'other' } });
-          setToast('Obrigado! Evento registrado.');
-        } catch {
-          setToast('Obrigado! (não foi possível registrar no servidor)');
-        }
-        setTimeout(() => navigate('/'), 2000);
+        navigate('/other');
         break;
     }
   };

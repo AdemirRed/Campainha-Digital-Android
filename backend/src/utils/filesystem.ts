@@ -6,6 +6,7 @@ const REQUIRED_DIRECTORIES = [
   process.env.VIDEOS_PATH || './data/storage/videos',
   process.env.PHOTOS_PATH || './data/storage/photos',
   process.env.THUMBNAILS_PATH || './data/storage/thumbnails',
+  process.env.AUDIOS_PATH || './data/storage/audios',
   './logs',
   './data'
 ];
