@@ -1,16 +1,13 @@
+import './loadEnv';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import path from 'path';
 import { setupMiddleware } from './middleware';
 import { setupRoutes } from './routes';
 import { Database } from './database';
 import { logger } from './utils/logger';
 import { ensureDirectories } from './utils/filesystem';
-
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -77,7 +77,7 @@ Se os dois números forem zero, apenas dê boas-vindas.`,
         text =
           stats.messagesCount === 0 && stats.unrecognizedVisitsCount === 0
             ? 'Nenhuma novidade nas últimas 24 horas.'
-            : `Você tem ${stats.messagesCount} mensagem${stats.messagesCount === 1 ? '' : 's'} e ${stats.unrecognizedVisitsCount} visita${stats.unrecognizedVisitsCount === 1 ? '' : 's'} não reconhecida${stats.unrecognizedVisitsCount === 1 ? '' : 's'} nas últimas 24 horas.`;
+            : `Você tem ${stats.messagesCount} ${stats.messagesCount === 1 ? 'mensagem' : 'mensagens'} e ${stats.unrecognizedVisitsCount} ${stats.unrecognizedVisitsCount === 1 ? 'visita não reconhecida' : 'visitas não reconhecidas'} nas últimas 24 horas.`;
       }
 
       res.json({ success: true, data: { text, stats } } as ApiResponse);
