@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- The kiosk WebView loads the frontend from http://localhost:3000
+         (served locally by `vite preview`) and that page in turn calls
+         the backend on the VPS, also over plain http - cleartext traffic
+         has to be allowed for this to work. -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

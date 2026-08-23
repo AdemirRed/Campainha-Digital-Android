@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <WebView
+        android:id="@+id/webview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Invisible tap zone in the top-left corner: tap it 5 times within
+         3 seconds to bring up the exit/reload menu (PIN-protected). This
+         is the only way out of the kiosk lock, so it must not be
+         discoverable by accident. -->
+    <View
+        android:id="@+id/exitGestureZone"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="top|start" />
+
+</FrameLayout>
