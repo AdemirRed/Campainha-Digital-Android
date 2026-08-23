@@ -156,6 +156,20 @@ class ApiService {
       body: JSON.stringify({ videoBase64 }),
     });
   }
+
+  // AI assistant (Ollama Cloud) - talks to unrecognized visitors and
+  // summarizes recent activity for recognized residents
+  async chatWithAssistant(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string> {
+    const result = await this.request<{ reply: string }>('/assistant/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    });
+    return result.reply;
+  }
+
+  async getAssistantSummary(): Promise<{ text: string; stats: any }> {
+    return this.request<{ text: string; stats: any }>('/assistant/summary');
+  }
 }
 
 export const apiService = new ApiService();

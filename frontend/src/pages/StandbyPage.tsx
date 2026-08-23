@@ -4,18 +4,21 @@ import { useMotionDetector } from '../hooks/useMotionDetector';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { speak } from '../utils/speech';
+import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
 import { EventType } from '@shared/types/event';
 
-type Phase = 'dormant' | 'active';
+type Phase = 'dormant' | 'active' | 'conversing';
 
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
+const MAX_CONVERSATION_TURNS = 3;
 
 export function StandbyPage() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [phase, setPhase] = useState<Phase>('dormant');
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
+  const [subtitle, setSubtitle] = useState<string | null>(null);
   const recognizingRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -29,8 +32,9 @@ export function StandbyPage() {
     }
   }, [motionDetected, phase, cameraError]);
 
-  // While actively trying to recognize a face, also record a short clip.
-  // If nobody gets matched, that clip becomes the "unrecognized visitor"
+  // While actively trying to recognize a face (and through the follow-up
+  // conversation with an unrecognized visitor), also record a clip. If
+  // nobody gets matched, that clip becomes the "unrecognized visitor"
   // record; if someone IS matched, the clip is simply discarded (the
   // resident_identified event is the record of that visit).
   function startRecording() {
@@ -74,6 +78,69 @@ export function StandbyPage() {
     });
   }
 
+  function finishVisit() {
+    recognizingRef.current = false;
+    setSubtitle(null);
+    setPhase('dormant');
+  }
+
+  // Talks to an unrecognized visitor via the AI assistant (Ollama Cloud):
+  // speak a greeting, listen, reply, repeat a few times, then save the
+  // whole exchange as a message for the residents.
+  async function converseWithVisitor() {
+    const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
+
+    const opening = 'Olá! Não te reconheci. Em que posso ajudar?';
+    speak(opening);
+    transcript.push({ role: 'assistant', content: opening });
+
+    if (!isSpeechRecognitionSupported()) {
+      // No mic input available on this browser/device - still leave a
+      // record that someone showed up, but skip the back-and-forth.
+      await uploadUnrecognizedClip();
+      finishVisit();
+      return;
+    }
+
+    for (let turn = 0; turn < MAX_CONVERSATION_TURNS; turn++) {
+      const said = await listenOnce();
+      if (!said.trim()) break;
+
+      transcript.push({ role: 'user', content: said });
+      setSubtitle(`Visitante: ${said}`);
+
+      try {
+        const reply = await apiService.chatWithAssistant(transcript);
+        transcript.push({ role: 'assistant', content: reply });
+        setSubtitle(reply);
+        speak(reply);
+        await new Promise((resolve) => setTimeout(resolve, Math.min(6000, reply.length * 90)));
+      } catch {
+        speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
+        break;
+      }
+    }
+
+    if (transcript.some((m) => m.role === 'user')) {
+      const summary = transcript
+        .map((m) => `${m.role === 'user' ? 'Visitante' : 'Assistente'}: ${m.content}`)
+        .join('\n');
+      apiService.sendMessage({ text: summary }).catch(() => {});
+    }
+
+    await uploadUnrecognizedClip();
+    finishVisit();
+  }
+
+  async function uploadUnrecognizedClip() {
+    const videoBase64 = await stopRecordingAndGetBase64();
+    if (videoBase64) {
+      apiService.recordUnrecognizedVisit(videoBase64).catch(() => {
+        // best-effort - a failed upload shouldn't block the kiosk flow
+      });
+    }
+  }
+
   useEffect(() => {
     if (phase !== 'active' || !videoRef.current) return;
 
@@ -106,34 +173,34 @@ export function StandbyPage() {
           metadata: { residentId: result.resident.id, name: result.resident.name },
         });
 
+        let summaryText = '';
+        try {
+          summaryText = (await apiService.getAssistantSummary()).text;
+        } catch {
+          // no summary available - still greet normally
+        }
+
         if (result.isAdmin) {
-          speak(`Bem-vindo, ${result.resident.name}. Acesso liberado.`);
+          speak(`Bem-vindo, ${result.resident.name}. ${summaryText}`.trim());
           navigate('/admin/residents', { state: { recognizedAdmin: true } });
           return;
         }
 
-        speak(`Bem-vindo, ${result.resident.name}!`);
+        speak(`Bem-vindo, ${result.resident.name}! ${summaryText}`.trim());
         setWelcomeName(result.resident.name);
+        setSubtitle(summaryText || null);
         setTimeout(() => {
           if (!cancelled) {
             setWelcomeName(null);
-            recognizingRef.current = false;
-            setPhase('dormant');
+            finishVisit();
           }
-        }, 3000);
+        }, 5000);
         return;
       }
 
-      const videoBase64 = await stopRecordingAndGetBase64();
-      if (videoBase64) {
-        apiService.recordUnrecognizedVisit(videoBase64).catch(() => {
-          // best-effort - a failed upload shouldn't block the kiosk flow
-        });
-      }
-
-      speak('Olá! Toque na tela para continuar.');
-      recognizingRef.current = false;
-      setPhase('dormant');
+      // Nobody matched - keep recording through the conversation, decide
+      // what to upload once it's over.
+      setPhase('conversing');
     }
 
     recognize();
@@ -142,6 +209,21 @@ export function StandbyPage() {
       cancelled = true;
     };
   }, [phase, navigate]);
+
+  useEffect(() => {
+    if (phase !== 'conversing') return;
+    let cancelled = false;
+
+    (async () => {
+      await converseWithVisitor();
+      if (cancelled) return;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   return (
     <div
@@ -155,6 +237,13 @@ export function StandbyPage() {
         <div style={{ textAlign: 'center' }}>
           <div className="icon mb-24">👋</div>
           <h1>Bem-vindo, {welcomeName}!</h1>
+          {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
+        </div>
+      ) : phase === 'conversing' ? (
+        <div style={{ textAlign: 'center' }}>
+          <div className="icon mb-24">🤖</div>
+          <h1>Assistente virtual</h1>
+          {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
         </div>
       ) : (
         <div className="loading">
