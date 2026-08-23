@@ -5,9 +5,12 @@ import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.text.InputType
 import android.view.View
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -16,11 +19,42 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var prefs: android.content.SharedPreferences
+    private var tts: TextToSpeech? = null
+
+    // Android WebView doesn't reliably implement the Web Speech API
+    // (window.speechSynthesis silently no-ops on many WebView versions,
+    // even though it works fine in real Chrome) - the assistant's voice
+    // was completely silent inside this app because of that. This bridge
+    // exposes Android's real TextToSpeech engine to the page instead;
+    // frontend/src/utils/speech.ts calls window.AndroidTTS.speak(...)
+    // when running inside this WebView and awaits the matching
+    // ttsDone(utteranceId) callback injected back into the page.
+    inner class TtsBridge {
+        @JavascriptInterface
+        fun speak(text: String, utteranceId: String) {
+            val engine = tts
+            if (engine == null) {
+                notifyTtsDone(utteranceId)
+                return
+            }
+            engine.speak(text, TextToSpeech.QUEUE_FLUSH, Bundle(), utteranceId)
+        }
+    }
+
+    private fun notifyTtsDone(utteranceId: String) {
+        runOnUiThread {
+            webView.evaluateJavascript(
+                "window.__ttsDone && window.__ttsDone(" + org.json.JSONObject.quote(utteranceId) + ")",
+                null
+            )
+        }
+    }
 
     private var tapCount = 0
     private var firstTapTime = 0L
@@ -45,6 +79,7 @@ class MainActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.webview)
         setupWebView()
+        setupTts()
 
         findViewById<View>(R.id.exitGestureZone).setOnClickListener { onExitZoneTapped() }
 
@@ -93,6 +128,26 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { request.grant(request.resources) }
             }
         }
+
+        webView.addJavascriptInterface(TtsBridge(), "AndroidTTS")
+    }
+
+    private fun setupTts() {
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("pt", "BR")
+            }
+        }
+        tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+            override fun onDone(utteranceId: String?) {
+                if (utteranceId != null) notifyTtsDone(utteranceId)
+            }
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                if (utteranceId != null) notifyTtsDone(utteranceId)
+            }
+        })
     }
 
     private fun requestRuntimePermissions() {
@@ -112,6 +167,12 @@ class MainActivity : AppCompatActivity() {
     // kiosk except through the PIN-protected exit menu.
     override fun onBackPressed() {
         // no-op on purpose
+    }
+
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
     }
 
     private fun currentUrl(): String = prefs.getString(KEY_URL, DEFAULT_URL) ?: DEFAULT_URL
