@@ -44,7 +44,16 @@ export async function computeFaceDescriptor(base64Image: string): Promise<number
   await ensureModelsLoaded();
 
   const buffer = base64ToBuffer(base64Image);
+  logger.info(`computeFaceDescriptor: received ${buffer.length} bytes`);
+
   const image = await loadImage(buffer);
+  logger.info(`computeFaceDescriptor: decoded image ${image.width}x${image.height}`);
+
+  const rawDetections = await faceapi.detectAllFaces(
+    image,
+    new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
+  );
+  logger.info(`computeFaceDescriptor: tinyFaceDetector found ${rawDetections.length} face(s), scores=${rawDetections.map((d: any) => d.score.toFixed(2)).join(',')}`);
 
   const detection = await faceapi
     .detectSingleFace(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
