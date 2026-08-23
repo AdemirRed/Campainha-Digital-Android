@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMotionDetector } from '../hooks/useMotionDetector';
-import { useFaceRecognition } from '../hooks/useFaceRecognition';
 import { apiService } from '../services/apiService';
+import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { EventType } from '@shared/types/event';
 
 type Phase = 'dormant' | 'active';
+
+const RECOGNITION_WINDOW_MS = 8000;
+const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
 
 export function StandbyPage() {
   const navigate = useNavigate();
@@ -15,14 +18,13 @@ export function StandbyPage() {
   const recognizingRef = useRef(false);
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
-  const { modelsReady, tryRecognize } = useFaceRecognition();
 
   useEffect(() => {
     if (cameraError) return;
-    if (phase === 'dormant' && motionDetected && modelsReady && !recognizingRef.current) {
+    if (phase === 'dormant' && motionDetected && !recognizingRef.current) {
       setPhase('active');
     }
-  }, [motionDetected, phase, modelsReady, cameraError]);
+  }, [motionDetected, phase, cameraError]);
 
   useEffect(() => {
     if (phase !== 'active' || !videoRef.current) return;
@@ -31,7 +33,20 @@ export function StandbyPage() {
     let cancelled = false;
 
     async function recognize() {
-      const result = await tryRecognize(videoRef.current!, 8000);
+      const start = Date.now();
+      let result: Awaited<ReturnType<typeof apiService.recognizeFace>> = null;
+
+      while (Date.now() - start < RECOGNITION_WINDOW_MS && !cancelled) {
+        try {
+          const base64 = captureVideoFrameAsBase64(videoRef.current!);
+          result = await apiService.recognizeFace(base64);
+          if (result) break;
+        } catch {
+          // no face in this frame / transient error, keep trying until the window closes
+        }
+        await new Promise((resolve) => setTimeout(resolve, RECOGNITION_ATTEMPT_INTERVAL_MS));
+      }
+
       if (cancelled) return;
 
       if (result) {
@@ -65,7 +80,7 @@ export function StandbyPage() {
     return () => {
       cancelled = true;
     };
-  }, [phase, tryRecognize, navigate]);
+  }, [phase, navigate]);
 
   return (
     <div

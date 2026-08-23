@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useFaceRecognition } from '../hooks/useFaceRecognition';
 import { apiService } from '../services/apiService';
+import { captureVideoFrameAsBase64, fileToBase64 } from '../utils/imageCapture';
 import Button from '../components/Button';
 import Toast from '../components/Toast';
 
@@ -23,8 +23,6 @@ export function AdminResidentsPage() {
   const [cameraStarted, setCameraStarted] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
-
-  const { modelsReady, modelError, residentsError, captureDescriptor } = useFaceRecognition();
 
   // Stop any open camera stream when leaving this page, otherwise it keeps
   // the camera device locked and other pages (StandbyPage) can't open it.
@@ -60,20 +58,18 @@ export function AdminResidentsPage() {
 
   async function captureOne() {
     if (!videoRef.current) return;
-    if (!modelsReady) {
-      setToast('Modelos de reconhecimento ainda não carregaram, aguarde e tente novamente');
-      return;
-    }
     setCapturing(true);
-    const descriptor = await captureDescriptor(videoRef.current);
-    setCapturing(false);
 
-    if (!descriptor) {
-      setToast('Nenhum rosto detectado, tente novamente');
-      return;
+    try {
+      const base64 = captureVideoFrameAsBase64(videoRef.current);
+      const descriptor = await apiService.getFaceDescriptor(base64);
+      setDescriptors((prev) => [...prev, descriptor]);
+      setToast('Foto capturada!');
+    } catch (err: any) {
+      setToast(err.message || 'Nenhum rosto detectado, tente novamente');
+    } finally {
+      setCapturing(false);
     }
-
-    setDescriptors((prev) => [...prev, descriptor]);
   }
 
   async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -81,33 +77,17 @@ export function AdminResidentsPage() {
     e.target.value = '';
     if (files.length === 0) return;
 
-    if (!modelsReady) {
-      setToast('Modelos de reconhecimento ainda não carregaram, aguarde e tente novamente');
-      return;
-    }
-
     setCapturing(true);
     let added = 0;
 
     for (const file of files) {
-      const url = URL.createObjectURL(file);
       try {
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const el = new Image();
-          el.onload = () => resolve(el);
-          el.onerror = () => reject(new Error('Falha ao carregar imagem'));
-          el.src = url;
-        });
-
-        const descriptor = await captureDescriptor(img);
-        if (descriptor) {
-          setDescriptors((prev) => [...prev, descriptor]);
-          added++;
-        }
+        const base64 = await fileToBase64(file);
+        const descriptor = await apiService.getFaceDescriptor(base64);
+        setDescriptors((prev) => [...prev, descriptor]);
+        added++;
       } catch {
         // skip files that fail to load or have no detectable face
-      } finally {
-        URL.revokeObjectURL(url);
       }
     }
 
@@ -170,23 +150,8 @@ export function AdminResidentsPage() {
       <div className="container">
         <h1 className="mb-24">Cadastrar Pessoa</h1>
         <p style={{ color: '#64748b', marginTop: '-16px', marginBottom: '16px' }}>
-          Moradores, visitantes frequentes, etc.
+          Moradores, visitantes frequentes, etc. (reconhecimento processado no servidor)
         </p>
-
-        {modelError && (
-          <p style={{ color: '#ef4444', marginBottom: '16px' }}>
-            Erro ao carregar reconhecimento facial: {modelError}
-          </p>
-        )}
-        {!modelsReady && !modelError && (
-          <p style={{ color: '#f59e0b', marginBottom: '16px' }}>Carregando modelos de reconhecimento...</p>
-        )}
-        {residentsError && (
-          <p style={{ color: '#ef4444', marginBottom: '16px' }}>
-            Não foi possível conectar ao servidor ({residentsError}). Você ainda pode capturar fotos,
-            mas o cadastro só será salvo quando o backend estiver acessível.
-          </p>
-        )}
 
         <input
           type="text"
@@ -221,11 +186,11 @@ export function AdminResidentsPage() {
         <div className="grid grid-1">
           {!cameraStarted && <Button onClick={startCamera}>Ligar câmera</Button>}
           {cameraStarted && (
-            <Button onClick={captureOne} disabled={capturing || !modelsReady}>
+            <Button onClick={captureOne} disabled={capturing}>
               {capturing ? 'Analisando rosto...' : `Capturar foto (${descriptors.length}/${CAPTURES_NEEDED})`}
             </Button>
           )}
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={capturing || !modelsReady}>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={capturing}>
             {capturing ? 'Analisando fotos...' : `Enviar fotos do dispositivo (${descriptors.length}/${CAPTURES_NEEDED})`}
           </Button>
           <Button variant="success" onClick={handleSave} disabled={descriptors.length === 0}>

@@ -105,6 +105,28 @@ class ApiService {
       },
     });
   }
+
+  // Face recognition (processed server-side)
+  async getFaceDescriptor(imageBase64: string): Promise<number[]> {
+    const result = await this.request<{ descriptor: number[] }>('/face/descriptor', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64 }),
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+    });
+    return result.descriptor;
+  }
+
+  async recognizeFace(imageBase64: string): Promise<{ resident: Resident; isAdmin: boolean } | null> {
+    return this.request<{ resident: Resident; isAdmin: boolean } | null>('/face/recognize', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64 }),
+      headers: {
+        'Authorization': `Bearer ${API_TOKEN}`,
+      },
+    });
+  }
 }
 
 export const apiService = new ApiService();
