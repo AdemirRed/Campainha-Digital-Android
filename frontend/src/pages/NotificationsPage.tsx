@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { apiService } from '../services/apiService';
+import { apiService, STORAGE_BASE_URL } from '../services/apiService';
 import { Event, EventType } from '@shared/types/event';
 import { speak } from '../utils/speech';
 
@@ -43,7 +43,7 @@ function playBeep() {
 export function NotificationsPage() {
   const [active, setActive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
-  const [history, setHistory] = useState<{ id: number; text: string; time: string }[]>([]);
+  const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const lastSeenIdRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -72,7 +72,9 @@ export function NotificationsPage() {
 
           if (cancelled) return;
           setBanner(text);
-          setHistory((prev) => [{ id: event.id, text, time: new Date().toLocaleTimeString('pt-BR') }, ...prev].slice(0, 20));
+          setHistory((prev) =>
+            [{ id: event.id, text, time: new Date().toLocaleTimeString('pt-BR'), event }, ...prev].slice(0, 20)
+          );
           playBeep();
           speak(text);
         }
@@ -150,7 +152,23 @@ export function NotificationsPage() {
               fontSize: '15px',
             }}
           >
-            <span style={{ color: '#64748b' }}>{item.time}</span> — {item.text}
+            <div>
+              <span style={{ color: '#64748b' }}>{item.time}</span> — {item.text}
+            </div>
+            {item.event.metadata?.videoFile && (
+              <video
+                controls
+                src={`${STORAGE_BASE_URL}/storage/videos/${item.event.metadata.videoFile}`}
+                style={{ width: '100%', maxWidth: '360px', marginTop: '8px', borderRadius: '8px' }}
+              />
+            )}
+            {item.event.metadata?.audioFile && (
+              <audio
+                controls
+                src={`${STORAGE_BASE_URL}/storage/audios/${item.event.metadata.audioFile}`}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            )}
           </div>
         ))}
       </div>

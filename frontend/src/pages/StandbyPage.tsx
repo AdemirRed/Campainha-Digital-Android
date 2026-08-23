@@ -9,6 +9,7 @@ import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognit
 import { EventType } from '@shared/types/event';
 
 type Phase = 'dormant' | 'active' | 'conversing';
+type RecognizeResult = Awaited<ReturnType<typeof apiService.recognizeFace>>;
 
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
@@ -27,6 +28,10 @@ export function StandbyPage() {
   const recognizingRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  // Set once a recognized resident interrupts an ongoing stranger
+  // conversation, so that flow can bail out cleanly instead of saving a
+  // pointless message/clip for someone who turned out to be a resident.
+  const interruptedByResidentRef = useRef(false);
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
   useContinuousRecording(videoRef, !cameraError);
@@ -98,10 +103,47 @@ export function StandbyPage() {
     setPhase('dormant');
   }
 
+  // Handles a successful face match, whether it happened during the
+  // initial recognition window or mid-conversation with someone who
+  // hadn't been matched yet (e.g. the resident walks up while the kiosk
+  // is still talking to an earlier, unidentified visitor).
+  async function handleRecognized(result: NonNullable<RecognizeResult>) {
+    stopRecordingAndGetBase64(); // discard - recognized visits don't need a clip
+
+    await apiService.createEvent({
+      type: EventType.RESIDENT_IDENTIFIED,
+      metadata: { residentId: result.resident.id, name: result.resident.name },
+    });
+
+    let summaryText = '';
+    try {
+      summaryText = (await apiService.getAssistantSummary()).text;
+    } catch {
+      // no summary available - still greet normally
+    }
+
+    if (result.isAdmin) {
+      speak(`Bem-vindo, ${result.resident.name}. ${summaryText}`.trim());
+      navigate('/admin/residents', { state: { recognizedAdmin: true } });
+      return;
+    }
+
+    speak(`Bem-vindo, ${result.resident.name}! ${summaryText}`.trim());
+    setWelcomeName(result.resident.name);
+    setSubtitle(summaryText || null);
+    setTimeout(() => {
+      setWelcomeName(null);
+      finishVisit();
+    }, 5000);
+  }
+
   // Talks to an unrecognized visitor via the AI assistant (Ollama Cloud):
   // speak a greeting, listen, reply, repeat a few times, then save the
-  // whole exchange as a message for the residents.
+  // whole exchange as a message for the residents. Also keeps trying
+  // face recognition in the background on each turn, in case the actual
+  // resident shows up mid-conversation.
   async function converseWithVisitor() {
+    interruptedByResidentRef.current = false;
     const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
 
     const opening = 'Olá! Não te reconheci. Em que posso ajudar?';
@@ -127,6 +169,24 @@ export function StandbyPage() {
     // shouldn't get cut off. Still bounded on both axes so it can't
     // hang forever.
     while (realTurns < MAX_CONVERSATION_TURNS && silentRetries < MAX_SILENT_RETRIES) {
+      // Piggyback a face-recognition attempt on every turn: if a resident
+      // walks up while we're still chatting with an unidentified visitor,
+      // switch straight to the welcome flow instead of recording a
+      // pointless message for someone who turns out to live here.
+      if (videoRef.current) {
+        try {
+          const base64 = captureVideoFrameAsBase64(videoRef.current);
+          const match = await apiService.recognizeFace(base64);
+          if (match) {
+            interruptedByResidentRef.current = true;
+            await handleRecognized(match);
+            return;
+          }
+        } catch {
+          // no face in this frame - keep going with the conversation
+        }
+      }
+
       const said = await listenOnce();
 
       if (!said.trim()) {
@@ -150,6 +210,8 @@ export function StandbyPage() {
         break;
       }
     }
+
+    if (interruptedByResidentRef.current) return;
 
     if (visitorMessages.length > 0) {
       apiService.sendMessage({ text: visitorMessages.join(' / ') }).catch(() => {});
@@ -177,7 +239,7 @@ export function StandbyPage() {
 
     async function recognize() {
       const start = Date.now();
-      let result: Awaited<ReturnType<typeof apiService.recognizeFace>> = null;
+      let result: RecognizeResult = null;
 
       while (Date.now() - start < RECOGNITION_WINDOW_MS && !cancelled) {
         try {
@@ -193,35 +255,7 @@ export function StandbyPage() {
       if (cancelled) return;
 
       if (result) {
-        stopRecordingAndGetBase64(); // discard - recognized visits don't need a clip
-
-        await apiService.createEvent({
-          type: EventType.RESIDENT_IDENTIFIED,
-          metadata: { residentId: result.resident.id, name: result.resident.name },
-        });
-
-        let summaryText = '';
-        try {
-          summaryText = (await apiService.getAssistantSummary()).text;
-        } catch {
-          // no summary available - still greet normally
-        }
-
-        if (result.isAdmin) {
-          speak(`Bem-vindo, ${result.resident.name}. ${summaryText}`.trim());
-          navigate('/admin/residents', { state: { recognizedAdmin: true } });
-          return;
-        }
-
-        speak(`Bem-vindo, ${result.resident.name}! ${summaryText}`.trim());
-        setWelcomeName(result.resident.name);
-        setSubtitle(summaryText || null);
-        setTimeout(() => {
-          if (!cancelled) {
-            setWelcomeName(null);
-            finishVisit();
-          }
-        }, 5000);
+        await handleRecognized(result);
         return;
       }
 
@@ -235,6 +269,7 @@ export function StandbyPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, navigate]);
 
   useEffect(() => {
