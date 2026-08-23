@@ -6,6 +6,10 @@ import { ApiResponse, PaginatedResponse } from '@shared/types/api';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 
+// The API URL is "<origin>/api"; uploaded media is served from
+// "<origin>/storage/...". Strip the "/api" suffix to get the origin.
+export const STORAGE_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
+
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -142,6 +146,14 @@ class ApiService {
     return this.request<Event>('/messages', {
       method: 'POST',
       body: JSON.stringify(message),
+    });
+  }
+
+  // Short video clip of a visitor the face recognition couldn't match
+  async recordUnrecognizedVisit(videoBase64: string): Promise<Event> {
+    return this.request<Event>('/visitors/unrecognized', {
+      method: 'POST',
+      body: JSON.stringify({ videoBase64 }),
     });
   }
 }

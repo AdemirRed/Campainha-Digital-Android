@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { apiService } from '../services/apiService';
+import { apiService, STORAGE_BASE_URL } from '../services/apiService';
 import { captureVideoFrameAsBase64, fileToBase64 } from '../utils/imageCapture';
 import { Resident } from '@shared/types/resident';
+import { Event, EventType } from '@shared/types/event';
 import Button from '../components/Button';
 import Toast from '../components/Toast';
 
@@ -45,8 +46,30 @@ export function AdminResidentsPage() {
     }
   }
 
+  const [messages, setMessages] = useState<Event[]>([]);
+  const [unrecognizedVisits, setUnrecognizedVisits] = useState<Event[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+
+  async function loadEvents() {
+    setEventsLoading(true);
+    try {
+      const { items } = await apiService.getEvents(1, 50);
+      setMessages(items.filter((e) => e.metadata?.reason === 'other'));
+      setUnrecognizedVisits(
+        items.filter((e) => e.type === EventType.PERSON_DETECTED && e.metadata?.recognized === false)
+      );
+    } catch {
+      // non-critical - the rest of the admin page still works without this
+    } finally {
+      setEventsLoading(false);
+    }
+  }
+
   useEffect(() => {
-    if (unlocked) loadResidents();
+    if (unlocked) {
+      loadResidents();
+      loadEvents();
+    }
   }, [unlocked]);
 
   async function handleDelete(resident: Resident) {
@@ -237,6 +260,9 @@ export function AdminResidentsPage() {
           <Button variant="success" onClick={handleSave} disabled={descriptors.length === 0}>
             Salvar cadastro
           </Button>
+          <Button variant="outline" onClick={() => navigate('/notifications')}>
+            🔔 Abrir tela de notificações
+          </Button>
           <Button variant="outline" onClick={() => navigate('/')}>Sair</Button>
         </div>
 
@@ -287,6 +313,63 @@ export function AdminResidentsPage() {
             >
               {deletingId === resident.id ? '...' : '🗑️'}
             </button>
+          </div>
+        ))}
+
+        <h2 className="mt-32 mb-16" style={{ fontSize: '24px' }}>Mensagens recebidas</h2>
+
+        {eventsLoading && <p>Carregando...</p>}
+        {!eventsLoading && messages.length === 0 && <p>Nenhuma mensagem ainda.</p>}
+
+        {messages.map((event) => (
+          <div
+            key={event.id}
+            style={{
+              padding: '12px 16px',
+              marginBottom: '10px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+              {new Date(event.created_at).toLocaleString('pt-BR')}
+            </div>
+            {event.metadata?.message && (
+              <div style={{ fontSize: '16px', marginBottom: '8px' }}>{event.metadata.message}</div>
+            )}
+            {event.metadata?.audioFile && (
+              <audio controls src={`${STORAGE_BASE_URL}/storage/audios/${event.metadata.audioFile}`} style={{ width: '100%' }} />
+            )}
+          </div>
+        ))}
+
+        <h2 className="mt-32 mb-16" style={{ fontSize: '24px' }}>Visitantes não reconhecidos</h2>
+
+        {eventsLoading && <p>Carregando...</p>}
+        {!eventsLoading && unrecognizedVisits.length === 0 && <p>Nenhum registro ainda.</p>}
+
+        {unrecognizedVisits.map((event) => (
+          <div
+            key={event.id}
+            style={{
+              padding: '12px 16px',
+              marginBottom: '10px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+              {new Date(event.created_at).toLocaleString('pt-BR')}
+            </div>
+            {event.metadata?.videoFile && (
+              <video
+                controls
+                src={`${STORAGE_BASE_URL}/storage/videos/${event.metadata.videoFile}`}
+                style={{ width: '100%', maxWidth: '400px' }}
+              />
+            )}
           </div>
         ))}
       </div>

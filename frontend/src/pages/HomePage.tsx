@@ -4,10 +4,12 @@ import { useInactivityTimer } from '../hooks/useInactivityTimer';
 import { BUTTON_OPTIONS } from '@shared/constants';
 import Button from '../components/Button';
 import Toast from '../components/Toast';
+import Tutorial, { useTutorial } from '../components/Tutorial';
 
 export function HomePage() {
   const navigate = useNavigate();
   const [toast, setToast] = useState<string | null>(null);
+  const { show: showTutorial, dismiss: dismissTutorial } = useTutorial();
 
   // Return to standby after 30 seconds of inactivity
   useInactivityTimer(() => {
@@ -60,6 +62,7 @@ export function HomePage() {
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {showTutorial && <Tutorial onDismiss={dismissTutorial} />}
     </div>
   );
 }

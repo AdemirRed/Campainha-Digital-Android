@@ -34,11 +34,15 @@ async function startServer() {
       : 'http://localhost:5173',
     credentials: true
   }));
-  app.use(express.json({ limit: '10mb' })); // base64 photos for face recognition
+  app.use(express.json({ limit: '25mb' })); // base64 photos/audio/short video clips
   app.use(express.urlencoded({ extended: true }));
 
   // Setup custom middleware
   setupMiddleware(app);
+
+  // Serve uploaded media (audio messages, visitor recordings) so <audio>/
+  // <video> tags in the admin panel can play them directly by URL.
+  app.use('/storage', express.static(process.env.STORAGE_PATH || './data/storage'));
 
   // Static files (for serving frontend in production)
   if (process.env.NODE_ENV === 'production') {
