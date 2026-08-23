@@ -27,7 +27,18 @@ class ApiService {
       throw new Error(`Não foi possível conectar em ${url} (backend rodando? URL correta?)`);
     }
 
-    const data: ApiResponse<T> = await response.json();
+    const rawBody = await response.text();
+    let data: ApiResponse<T>;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      // A rate limiter, reverse proxy, or crash page can return plain
+      // text/HTML instead of JSON - surface something readable instead
+      // of a cryptic "Unexpected token" parse error.
+      throw new Error(
+        rawBody.slice(0, 200) || `Resposta inesperada do servidor (${response.status})`
+      );
+    }
 
     if (!data.success) {
       throw new Error(data.error || `Request failed (${response.status})`);

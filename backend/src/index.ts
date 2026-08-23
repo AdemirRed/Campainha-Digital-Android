@@ -25,10 +25,16 @@ async function startServer() {
   app.use(helmet({
     contentSecurityPolicy: false // Disable for development, enable in production
   }));
+  // The frontend is opened from whatever address each device on the local
+  // network happens to use (localhost:3000 on the kiosk phone itself,
+  // 192.168.x.x:3000 from a PC/tablet on the same Wi-Fi, the /notifications
+  // page on a second device, etc). Pinning CORS to one fixed FRONTEND_URL
+  // broke every other origin's requests. Since every route that touches
+  // real data is already gated by the Bearer API_TOKEN, reflecting
+  // whichever origin made the request (rather than a fixed allowlist) is
+  // an acceptable tradeoff for this single-household deployment.
   app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-      ? process.env.FRONTEND_URL 
-      : 'http://localhost:5173',
+    origin: true,
     credentials: true
   }));
   app.use(express.json({ limit: '25mb' })); // base64 photos/audio/short video clips
