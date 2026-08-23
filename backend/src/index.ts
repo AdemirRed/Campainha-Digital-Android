@@ -23,7 +23,13 @@ async function startServer() {
 
   // Middleware
   app.use(helmet({
-    contentSecurityPolicy: false // Disable for development, enable in production
+    contentSecurityPolicy: false, // Disable for development, enable in production
+    // Same reasoning as the CORS origin:true below - this app is loaded
+    // from several different device/IP origins on the same network, and
+    // helmet's default "same-origin" CORP header silently blocks the
+    // browser from using cross-origin video/audio/fetch responses even
+    // when CORS itself allows them (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin).
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
   }));
   // The frontend is opened from whatever address each device on the local
   // network happens to use (localhost:3000 on the kiosk phone itself,
