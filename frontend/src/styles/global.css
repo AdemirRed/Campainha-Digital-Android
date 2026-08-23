@@ -53,8 +53,15 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* justify-content: center collapses to the top once content overflows
+     and needs to scroll - flex-start plus auto margins on the content
+     (via .container's own margin) keeps short pages centered anyway. */
+  justify-content: safe center;
   padding: 20px;
+  /* Pages with more content than fits one screen (e.g. forms with a
+     camera preview and several buttons) scroll internally instead of
+     hiding their bottom buttons - the outer html/body stays locked. */
+  overflow-y: auto;
 }
 
 .container {

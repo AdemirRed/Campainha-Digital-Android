@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64, fileToBase64 } from '../utils/imageCapture';
 import Button from '../components/Button';
@@ -10,10 +10,12 @@ const CAPTURES_NEEDED = 4;
 
 export function AdminResidentsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const recognizedAdmin = Boolean((location.state as any)?.recognizedAdmin);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [unlocked, setUnlocked] = useState(false);
+  const [unlocked, setUnlocked] = useState(recognizedAdmin);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
 

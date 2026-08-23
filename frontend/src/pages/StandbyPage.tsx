@@ -56,7 +56,7 @@ export function StandbyPage() {
         });
 
         if (result.isAdmin) {
-          navigate('/admin/residents');
+          navigate('/admin/residents', { state: { recognizedAdmin: true } });
           return;
         }
 
