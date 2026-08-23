@@ -13,6 +13,10 @@ type Phase = 'dormant' | 'active' | 'conversing';
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
 const MAX_CONVERSATION_TURNS = 3;
+// Safety cap on total listen attempts (including silent ones while
+// someone's still visibly there) - stops the kiosk holding the
+// conversation open forever if motion detection sticks on.
+const MAX_SILENT_RETRIES = 4;
 
 export function StandbyPage() {
   const navigate = useNavigate();
@@ -26,6 +30,14 @@ export function StandbyPage() {
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
   useContinuousRecording(videoRef, !cameraError);
+
+  // converseWithVisitor() runs inside an async loop and needs the latest
+  // motion reading at each step, not the value from when it started -
+  // a ref (kept in sync below) avoids a stale closure over the state.
+  const motionRef = useRef(motionDetected);
+  useEffect(() => {
+    motionRef.current = motionDetected;
+  }, [motionDetected]);
 
   useEffect(() => {
     if (cameraError) return;
@@ -106,11 +118,24 @@ export function StandbyPage() {
     }
 
     const visitorMessages: string[] = [];
+    let realTurns = 0;
+    let silentRetries = 0;
 
-    for (let turn = 0; turn < MAX_CONVERSATION_TURNS; turn++) {
+    // Keeps listening past a silent attempt as long as the person is
+    // still visibly there (motionRef), instead of giving up on the
+    // first pause - someone reading a sign or deciding what to say
+    // shouldn't get cut off. Still bounded on both axes so it can't
+    // hang forever.
+    while (realTurns < MAX_CONVERSATION_TURNS && silentRetries < MAX_SILENT_RETRIES) {
       const said = await listenOnce();
-      if (!said.trim()) break;
 
+      if (!said.trim()) {
+        silentRetries++;
+        if (!motionRef.current) break; // they've actually left
+        continue; // still there, listen again
+      }
+
+      realTurns++;
       visitorMessages.push(said);
       transcript.push({ role: 'user', content: said });
       setSubtitle(`Visitante: ${said}`);

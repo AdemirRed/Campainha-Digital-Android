@@ -21,7 +21,7 @@ export function CallResidentPage() {
 
     async function run() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;

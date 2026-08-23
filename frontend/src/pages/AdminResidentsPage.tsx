@@ -117,7 +117,7 @@ export function AdminResidentsPage() {
         {tab === 'messages' && <AdminMessagesTab showToast={setToast} />}
         {tab === 'visitors' && <AdminVisitorsTab showToast={setToast} />}
         {tab === 'recordings' && <AdminRecordingsTab showToast={setToast} />}
-        {tab === 'settings' && <AdminSettingsTab />}
+        {tab === 'settings' && <AdminSettingsTab showToast={setToast} />}
       </div>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

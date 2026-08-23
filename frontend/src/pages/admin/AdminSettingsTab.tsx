@@ -17,11 +17,14 @@ interface Usage {
   totalBytes: number;
 }
 
-export function AdminSettingsTab() {
+export function AdminSettingsTab({ showToast }: { showToast: (msg: string) => void }) {
   const navigate = useNavigate();
   const [usage, setUsage] = useState<Usage | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [instructions, setInstructions] = useState('');
+  const [savingInstructions, setSavingInstructions] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -30,7 +33,21 @@ export function AdminSettingsTab() {
       .then(setUsage)
       .catch((err) => setError(err.message || 'Erro ao carregar uso de armazenamento'))
       .finally(() => setLoading(false));
+
+    apiService.getAssistantInstructions().then(setInstructions);
   }, []);
+
+  async function handleSaveInstructions() {
+    setSavingInstructions(true);
+    try {
+      await apiService.setAssistantInstructions(instructions);
+      showToast('Instruções salvas!');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao salvar');
+    } finally {
+      setSavingInstructions(false);
+    }
+  }
 
   return (
     <div>
@@ -60,6 +77,35 @@ export function AdminSettingsTab() {
           </div>
         </div>
       )}
+
+      <h2 className="mb-16" style={{ fontSize: '24px' }}>Instruções para o assistente</h2>
+      <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
+        O que a IA deve dizer para visitantes específicos, ex: "Se for entrega do Mercado Livre, o
+        código é 1234. Peça para o entregador deixar o pacote na cadeira da varanda."
+      </p>
+      <textarea
+        value={instructions}
+        onChange={(e) => setInstructions(e.target.value)}
+        rows={5}
+        placeholder="Digite as instruções..."
+        style={{
+          width: '100%',
+          padding: '14px',
+          fontSize: '16px',
+          borderRadius: '10px',
+          border: '2px solid var(--border)',
+          background: 'var(--bg-darker)',
+          color: 'var(--text-light)',
+          marginBottom: '12px',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+        }}
+      />
+      <div className="grid grid-1" style={{ marginBottom: '24px' }}>
+        <Button onClick={handleSaveInstructions} disabled={savingInstructions}>
+          {savingInstructions ? 'Salvando...' : 'Salvar instruções'}
+        </Button>
+      </div>
 
       <h2 className="mb-16" style={{ fontSize: '24px' }}>Notificações</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>

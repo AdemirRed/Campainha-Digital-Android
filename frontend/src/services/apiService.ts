@@ -212,6 +212,27 @@ class ApiService {
   async deleteContinuousRecording(filename: string): Promise<void> {
     await this.request<void>(`/recordings/${encodeURIComponent(filename)}`, { method: 'DELETE' });
   }
+
+  // Standing instructions the resident leaves for the AI assistant to
+  // follow in every conversation (e.g. delivery codes, where to leave packages)
+  async getAssistantInstructions(): Promise<string> {
+    try {
+      const result = await this.request<{ value: string }>('/settings/assistant_instructions', {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      return result.value;
+    } catch {
+      return '';
+    }
+  }
+
+  async setAssistantInstructions(value: string): Promise<void> {
+    await this.request(`/settings/assistant_instructions`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
 }
 
 export const apiService = new ApiService();

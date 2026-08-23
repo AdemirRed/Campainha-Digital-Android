@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-const CHECK_INTERVAL_MS = 1000;
-const DIFF_THRESHOLD = 25;
+const CHECK_INTERVAL_MS = 700;
+// Averaged over the whole sampled frame, someone walking up from a
+// few meters away only shifts a small fraction of the pixels - diluted
+// by the mostly-unchanged background, that used to need something as
+// close and fast as a hand waving right at the lens to cross 25. Lowered
+// so a person simply entering frame registers.
+const DIFF_THRESHOLD = 9;
 const SAMPLE_WIDTH = 64;
 const SAMPLE_HEIGHT = 48;
 
@@ -22,7 +27,10 @@ export function useMotionDetector(videoRef: React.RefObject<HTMLVideoElement>, e
 
     async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        // Audio track included so the same stream can be recorded with
+        // sound (visitor conversations, unrecognized-visitor clips)
+        // without opening a second, separate microphone session.
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;

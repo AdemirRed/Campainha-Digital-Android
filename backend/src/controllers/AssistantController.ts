@@ -1,20 +1,41 @@
 import { Request, Response } from 'express';
 import { chatWithOllama, ChatMessage } from '../services/OllamaService';
 import { EventRepository } from '../database/repositories/EventRepository';
+import { SettingsRepository } from '../database/repositories/SettingsRepository';
 import { EventType } from '@shared/types/event';
 import { ApiResponse } from '@shared/types/api';
 
-const VISITOR_SYSTEM_PROMPT = `Você é o assistente virtual de uma campainha inteligente residencial.
-Um visitante não reconhecido está falando com você pelo interfone.
-Seja breve, educado e prestativo - no máximo 2 frases curtas por resposta.
-Descubra o motivo da visita e ofereça para registrar um recado para o morador.
-Nunca informe se há alguém em casa ou não. Responda sempre em português do Brasil.`;
+const TIMEZONE = 'America/Sao_Paulo';
+
+function formatLocalTime(sqliteTimestamp: string): string {
+  // SQLite's CURRENT_TIMESTAMP is UTC with no offset marker - without
+  // forcing the timezone here, the LLM (and anyone reading the raw
+  // string) has no way to know it's not already local time.
+  const date = new Date(sqliteTimestamp.replace(' ', 'T') + 'Z');
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+const BASE_VISITOR_PROMPT = `Você é o assistente virtual de uma campainha inteligente residencial, com a
+simpatia e o jeitinho de quem realmente mora ali - não uma central de atendimento genérica.
+Um visitante está falando com você pelo interfone.
+Seja breve, natural e prestativo - no máximo 2 frases curtas por resposta.
+Descubra o motivo da visita e ajude com o que for preciso: entregadores, prestadores de serviço,
+vizinhos, etc. Se souberem que tipo de entrega é (Mercado Livre, iFood, Correios...), responda de
+forma útil e específica em vez de genérica.
+Nunca confirme ou negue se há alguém em casa. Ofereça sempre registrar um recado para o morador.
+Responda sempre em português do Brasil.`;
 
 export class AssistantController {
   private eventRepo: EventRepository;
+  private settingsRepo: SettingsRepository;
 
   constructor() {
     this.eventRepo = new EventRepository();
+    this.settingsRepo = new SettingsRepository();
   }
 
   async chat(req: Request, res: Response): Promise<void> {
@@ -26,7 +47,15 @@ export class AssistantController {
         return;
       }
 
-      const reply = await chatWithOllama([{ role: 'system', content: VISITOR_SYSTEM_PROMPT }, ...messages]);
+      // Residents can leave standing instructions (e.g. "se for entrega do
+      // Mercado Livre, o código é 1234; peça para deixar na cadeira")
+      // via the admin panel, applied to every conversation.
+      const customInstructions = this.settingsRepo.get('assistant_instructions');
+      const systemPrompt = customInstructions
+        ? `${BASE_VISITOR_PROMPT}\n\nInstruções do morador para você seguir:\n${customInstructions}`
+        : BASE_VISITOR_PROMPT;
+
+      const reply = await chatWithOllama([{ role: 'system', content: systemPrompt }, ...messages]);
 
       res.json({ success: true, data: { reply } } as ApiResponse);
     } catch (error: any) {
@@ -54,6 +83,7 @@ export class AssistantController {
         unrecognizedVisitsCount: unrecognizedVisits.length,
         lastUnrecognizedAt: lastUnrecognized?.created_at || null,
       };
+      const lastUnrecognizedLocalTime = lastUnrecognized ? formatLocalTime(lastUnrecognized.created_at) : null;
 
       let text: string;
       try {
@@ -67,7 +97,7 @@ export class AssistantController {
           {
             role: 'user',
             content: `Dados: ${stats.messagesCount} mensagem(ns) recebida(s), ${stats.unrecognizedVisitsCount} visita(s)
-não reconhecida(s)${stats.lastUnrecognizedAt ? `, a última às ${stats.lastUnrecognizedAt}` : ''}.
+não reconhecida(s)${lastUnrecognizedLocalTime ? `, a última às ${lastUnrecognizedLocalTime} (horário de Brasília)` : ''}.
 Se os dois números forem zero, apenas dê boas-vindas.`,
           },
         ]);
