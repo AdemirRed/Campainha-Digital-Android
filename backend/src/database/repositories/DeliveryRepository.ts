@@ -1,5 +1,13 @@
 import { Database } from '..';
-import { Delivery, CreateDeliveryDTO } from '@shared/types/delivery';
+import { Delivery, DeliveryCompany } from '@shared/types/delivery';
+
+interface CreateDeliveryRow {
+  event_id: number;
+  company: DeliveryCompany;
+  tracking_code?: string;
+  notes?: string;
+  photo_path?: string | null;
+}
 
 export class DeliveryRepository {
   private db;
@@ -8,15 +16,16 @@ export class DeliveryRepository {
     this.db = Database.getInstance().getDb();
   }
 
-  create(data: CreateDeliveryDTO): Delivery {
+  create(data: CreateDeliveryRow): Delivery {
     this.db.run(`
-      INSERT INTO deliveries (event_id, company, tracking_code, notes)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO deliveries (event_id, company, tracking_code, notes, photo_path)
+      VALUES (?, ?, ?, ?, ?)
     `, [
       data.event_id,
       data.company,
       data.tracking_code || null,
-      data.notes || null
+      data.notes || null,
+      data.photo_path || null
     ]);
 
     // Must read last_insert_rowid() before save() - sql.js's export() resets it
@@ -75,6 +84,11 @@ export class DeliveryRepository {
     return result[0].values[0][0] as number;
   }
 
+  delete(id: number): void {
+    this.db.run('DELETE FROM deliveries WHERE id = ?', [id]);
+    Database.getInstance().save();
+  }
+
   private mapResultToDelivery(result: any, index: number): Delivery {
     const columns = result.columns;
     const values = result.values[index];
@@ -90,6 +104,7 @@ export class DeliveryRepository {
       company: delivery.company,
       tracking_code: delivery.tracking_code,
       notes: delivery.notes,
+      photo_path: delivery.photo_path,
       created_at: delivery.created_at
     };
   }

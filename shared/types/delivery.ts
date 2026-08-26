@@ -12,6 +12,7 @@ export interface Delivery {
   company: DeliveryCompany;
   tracking_code?: string;
   notes?: string;
+  photo_path?: string | null;
   created_at: string;
 }
 
@@ -20,4 +21,5 @@ export interface CreateDeliveryDTO {
   company: DeliveryCompany;
   tracking_code?: string;
   notes?: string;
+  photoBase64?: string;
 }

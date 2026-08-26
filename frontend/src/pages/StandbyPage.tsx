@@ -207,11 +207,34 @@ export function StandbyPage() {
       : 'Olá! Não te reconheci. Em que posso ajudar?';
     transcript.push({ role: 'assistant', content: opening });
     setSubtitle(opening);
+
+    // Someone the system already knows but who isn't a resident (e.g. a
+    // recurring delivery driver) - push a near-live feed to /notifications
+    // for the rest of this conversation.
+    let liveInterval: ReturnType<typeof setInterval> | null = null;
+    if (knownVisitor) {
+      const label = `🔁 ${knownVisitor.name} (visitante conhecido)`;
+      liveInterval = setInterval(() => {
+        if (!videoRef.current) return;
+        try {
+          const frame = captureVideoFrameAsBase64(videoRef.current, 0.6);
+          apiService.pushLiveFrame(frame, label).catch(() => {});
+        } catch {
+          // frame not ready this tick - skip
+        }
+      }, 1500);
+    }
+    const stopLiveFeed = () => {
+      if (liveInterval) clearInterval(liveInterval);
+      if (knownVisitor) apiService.stopLive().catch(() => {});
+    };
+
     await speak(opening); // must finish talking before listening, or the mic hears itself
 
     if (!isSpeechRecognitionSupported()) {
       // No mic input available on this browser/device - still leave a
       // record that someone showed up, but skip the back-and-forth.
+      stopLiveFeed();
       await uploadUnrecognizedClip();
       finishVisit();
       return;
@@ -242,6 +265,7 @@ export function StandbyPage() {
           const match = await apiService.recognizeFace(base64);
           if (match) {
             interruptedByResidentRef.current = true;
+            stopLiveFeed();
             await handleRecognized(match);
             return;
           }
@@ -303,6 +327,8 @@ export function StandbyPage() {
         }
       }
     }
+
+    stopLiveFeed();
 
     if (interruptedByResidentRef.current) return;
 

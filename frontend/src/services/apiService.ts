@@ -79,6 +79,28 @@ class ApiService {
     return this.request<PaginatedResponse<Delivery>>(`/deliveries?page=${page}&pageSize=${pageSize}`);
   }
 
+  async deleteDelivery(id: number): Promise<void> {
+    await this.request<void>(`/deliveries/${id}`, { method: 'DELETE' });
+  }
+
+  // Near-live camera feed: the kiosk pushes a frame every ~1.5s while a
+  // delivery person or a known-but-not-a-resident visitor is at the
+  // door; /notifications polls getLiveStatus to show it.
+  async pushLiveFrame(imageBase64: string, label: string): Promise<void> {
+    await this.request('/live/frame', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64, label }),
+    });
+  }
+
+  async getLiveStatus(): Promise<{ active: boolean; label?: string; frameBase64?: string }> {
+    return this.request('/live/status');
+  }
+
+  async stopLive(): Promise<void> {
+    await this.request('/live/stop', { method: 'POST' });
+  }
+
   // Settings (requires auth)
   async getSettings(token: string): Promise<any> {
     return this.request<any>('/settings', {

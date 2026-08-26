@@ -8,6 +8,7 @@ export function createDeliveryRouter(): Router {
   router.post('/', deliveryController.create.bind(deliveryController));
   router.get('/', deliveryController.getAll.bind(deliveryController));
   router.get('/:id', deliveryController.getById.bind(deliveryController));
+  router.delete('/:id', deliveryController.delete.bind(deliveryController));
 
   return router;
 }

@@ -98,6 +98,12 @@ export function runMigrations(db: SqlJsDatabase): void {
           last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `
+    },
+    {
+      name: '007_add_photo_to_deliveries',
+      sql: `
+        ALTER TABLE deliveries ADD COLUMN photo_path TEXT;
+      `
     }
   ];
 
