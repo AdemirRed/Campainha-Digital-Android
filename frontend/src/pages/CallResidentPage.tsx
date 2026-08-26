@@ -5,7 +5,8 @@ import { speak } from '../utils/speech';
 import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
 import { EventType } from '@shared/types/event';
 
-const MAX_TURNS = 3;
+const MAX_TURNS = 6;
+const LISTEN_TIMEOUT_MS = 10000;
 
 export function CallResidentPage() {
   const navigate = useNavigate();
@@ -94,13 +95,15 @@ export function CallResidentPage() {
       const qaPairs: string[] = [];
       let lastAssistantLine = opening;
 
+      let reachedTurnLimit = false;
+
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TURNS && !cancelled; turn++) {
           // Recording and SpeechRecognition can't both hold the mic at
           // once on this WebView - pause the segment for the listen
           // window, then start a new one right after.
           await stopRecordingSegment();
-          const said = await listenOnce();
+          const said = await listenOnce(LISTEN_TIMEOUT_MS);
           await startRecordingSegment();
 
           if (!said.trim()) break;
@@ -119,10 +122,18 @@ export function CallResidentPage() {
             if (!cancelled) await speak('Desculpe, tive um problema para responder agora.');
             break;
           }
+
+          if (turn === MAX_TURNS - 1) reachedTurnLimit = true;
         }
       }
 
       if (cancelled) return;
+
+      if (reachedTurnLimit) {
+        const closing = 'Preciso encerrar por aqui, mas já registrei tudo para o morador. Obrigado!';
+        setSubtitle(closing);
+        await speak(closing);
+      }
 
       if (qaPairs.length > 0) {
         apiService.sendMessage({ text: qaPairs.join('\n\n') }).catch(() => {});

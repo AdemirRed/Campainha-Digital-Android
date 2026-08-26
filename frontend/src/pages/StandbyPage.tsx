@@ -13,11 +13,19 @@ type RecognizeResult = Awaited<ReturnType<typeof apiService.recognizeFace>>;
 
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
-const MAX_CONVERSATION_TURNS = 3;
+// A 3-turn cap felt like the assistant hanging up mid-conversation -
+// most real exchanges (motive, details, "quer deixar recado?") need more
+// room than that.
+const MAX_CONVERSATION_TURNS = 6;
 // Safety cap on total listen attempts (including silent ones while
 // someone's still visibly there) - stops the kiosk holding the
-// conversation open forever if motion detection sticks on.
-const MAX_SILENT_RETRIES = 4;
+// conversation open forever if motion detection sticks on. Generous
+// because someone thinking or speaking slowly can trigger a few empty
+// results in a row from the speech engine's silence detection.
+const MAX_SILENT_RETRIES = 6;
+// A bit more room to start talking than the 8s default before the mic
+// gives up on that turn.
+const LISTEN_TIMEOUT_MS = 10000;
 
 export function StandbyPage() {
   const navigate = useNavigate();
@@ -114,7 +122,7 @@ export function StandbyPage() {
   // fresh one right after.
   async function listenWithMicReleased(): Promise<string> {
     await stopRecordingSegment();
-    const said = await listenOnce();
+    const said = await listenOnce(LISTEN_TIMEOUT_MS);
     await startRecordingSegment();
     return said;
   }
@@ -248,6 +256,8 @@ export function StandbyPage() {
     let silentRetries = 0;
     let identified = !!knownVisitor;
     let nameAsked = false;
+    let leftSilently = false;
+    let endedWithError = false;
 
     // Keeps listening past a silent attempt as long as the person is
     // still visibly there (motionRef), instead of giving up on the
@@ -278,7 +288,10 @@ export function StandbyPage() {
 
       if (!said.trim()) {
         silentRetries++;
-        if (!motionRef.current) break; // they've actually left
+        if (!motionRef.current) {
+          leftSilently = true;
+          break; // they've actually left
+        }
         continue; // still there, listen again
       }
 
@@ -295,6 +308,7 @@ export function StandbyPage() {
         await speak(reply);
       } catch {
         await speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
+        endedWithError = true;
         break;
       }
 
@@ -328,9 +342,22 @@ export function StandbyPage() {
       }
     }
 
-    stopLiveFeed();
+    if (interruptedByResidentRef.current) {
+      stopLiveFeed();
+      return;
+    }
 
-    if (interruptedByResidentRef.current) return;
+    // The loop only exits without an explicit break when the turn/retry
+    // caps were hit while the visitor was still there mid-conversation -
+    // that deserves a proper goodbye instead of the assistant just
+    // going quiet on them.
+    if (!leftSilently && !endedWithError) {
+      const closing = 'Preciso encerrar por aqui, mas já registrei tudo para o morador. Obrigado pela visita!';
+      setSubtitle(closing);
+      await speak(closing);
+    }
+
+    stopLiveFeed();
 
     if (qaPairs.length > 0) {
       apiService.sendMessage({ text: qaPairs.join('\n\n') }).catch(() => {});

@@ -27,6 +27,11 @@ Descubra o motivo da visita e ajude com o que for preciso: entregadores, prestad
 vizinhos, etc. Se souberem que tipo de entrega é (Mercado Livre, iFood, Correios...), responda de
 forma útil e específica em vez de genérica.
 Ofereça sempre registrar um recado para o morador.
+Não existe integração com WhatsApp, SMS, e-mail ou qualquer outro app de mensagens - nunca diga
+que vai "avisar por WhatsApp", "mandar mensagem", "notificar agora" ou algo do tipo. O único
+mecanismo real é: o recado fica salvo e o morador vê quando quiser no painel dele, ou você mesmo
+pode avisá-lo se ele chegar em casa e perguntar se há recados. Diga apenas isso, com suas próprias
+palavras.
 Responda sempre em português do Brasil.`;
 
 const PRESENCE_STALE_HOURS = 12;
