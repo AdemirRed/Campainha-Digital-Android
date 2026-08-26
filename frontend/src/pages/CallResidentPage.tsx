@@ -5,8 +5,11 @@ import { speak } from '../utils/speech';
 import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
 import { EventType } from '@shared/types/event';
 
-const MAX_TURNS = 6;
 const LISTEN_TIMEOUT_MS = 10000;
+// Pure infinite-loop guard, not a UX limit - conversation length is
+// driven by silence/goodbye detection below, not a turn count.
+const MAX_TOTAL_TURNS = 20;
+const FAREWELL_PATTERN = /\b(tchau|até logo|até mais|falou|flw|é s[oó] isso|s[oó] isso mesmo|nada mais|era s[oó] isso|pode ir|já vou|até a próxima)\b/i;
 
 export function CallResidentPage() {
   const navigate = useNavigate();
@@ -95,10 +98,16 @@ export function CallResidentPage() {
       const qaPairs: string[] = [];
       let lastAssistantLine = opening;
 
-      let reachedTurnLimit = false;
+      let endedWithError = false;
+      let leftSilently = false;
+      let saidGoodbye = false;
+      // On the first silent turn, warn instead of ending right away -
+      // only a second silent turn in a row (after the warning) ends the
+      // conversation. Any real answer resets this.
+      let warnedSilence = false;
 
       if (isSpeechRecognitionSupported()) {
-        for (let turn = 0; turn < MAX_TURNS && !cancelled; turn++) {
+        for (let turn = 0; turn < MAX_TOTAL_TURNS && !cancelled; turn++) {
           // Recording and SpeechRecognition can't both hold the mic at
           // once on this WebView - pause the segment for the listen
           // window, then start a new one right after.
@@ -106,11 +115,24 @@ export function CallResidentPage() {
           const said = await listenOnce(LISTEN_TIMEOUT_MS);
           await startRecordingSegment();
 
-          if (!said.trim()) break;
+          if (!said.trim()) {
+            if (!warnedSilence) {
+              warnedSilence = true;
+              const warn = 'Ainda está aí? Vou encerrar em instantes se não ouvir uma resposta.';
+              setSubtitle(warn);
+              if (!cancelled) await speak(warn);
+              continue; // give one more chance after the warning
+            }
+            leftSilently = true;
+            break;
+          }
 
+          warnedSilence = false; // they responded - reset the silence strike
           qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
           transcript.push({ role: 'user', content: said });
           setSubtitle(`Você: ${said}`);
+
+          const isFarewell = FAREWELL_PATTERN.test(said);
 
           try {
             const reply = await apiService.chatWithAssistant(transcript);
@@ -120,16 +142,20 @@ export function CallResidentPage() {
             if (!cancelled) await speak(reply);
           } catch {
             if (!cancelled) await speak('Desculpe, tive um problema para responder agora.');
+            endedWithError = true;
             break;
           }
 
-          if (turn === MAX_TURNS - 1) reachedTurnLimit = true;
+          if (isFarewell) {
+            saidGoodbye = true;
+            break;
+          }
         }
       }
 
       if (cancelled) return;
 
-      if (reachedTurnLimit) {
+      if (!leftSilently && !endedWithError && !saidGoodbye) {
         const closing = 'Preciso encerrar por aqui, mas já registrei tudo para o morador. Obrigado!';
         setSubtitle(closing);
         await speak(closing);

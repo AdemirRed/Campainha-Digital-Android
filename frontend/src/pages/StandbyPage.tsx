@@ -13,19 +13,15 @@ type RecognizeResult = Awaited<ReturnType<typeof apiService.recognizeFace>>;
 
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
-// A 3-turn cap felt like the assistant hanging up mid-conversation -
-// most real exchanges (motive, details, "quer deixar recado?") need more
-// room than that.
-const MAX_CONVERSATION_TURNS = 6;
-// Safety cap on total listen attempts (including silent ones while
-// someone's still visibly there) - stops the kiosk holding the
-// conversation open forever if motion detection sticks on. Generous
-// because someone thinking or speaking slowly can trigger a few empty
-// results in a row from the speech engine's silence detection.
-const MAX_SILENT_RETRIES = 6;
 // A bit more room to start talking than the 8s default before the mic
 // gives up on that turn.
 const LISTEN_TIMEOUT_MS = 10000;
+// Pure infinite-loop guard, not a UX limit - conversation length is
+// driven by silence/goodbye detection below, not a turn count.
+const MAX_TOTAL_TURNS = 20;
+// Phrases that mean "I'm done talking" - end the conversation right
+// after replying instead of waiting for a silent turn.
+const FAREWELL_PATTERN = /\b(tchau|até logo|até mais|falou|flw|é s[oó] isso|s[oó] isso mesmo|nada mais|era s[oó] isso|pode ir|já vou|até a próxima)\b/i;
 
 export function StandbyPage() {
   const navigate = useNavigate();
@@ -253,18 +249,20 @@ export function StandbyPage() {
     const qaPairs: string[] = [];
     let lastAssistantLine = opening;
     let realTurns = 0;
-    let silentRetries = 0;
     let identified = !!knownVisitor;
     let nameAsked = false;
     let leftSilently = false;
     let endedWithError = false;
+    let saidGoodbye = false;
+    // On the first silent turn, warn instead of ending right away - only
+    // a second silent turn in a row (after the warning) actually ends
+    // the conversation. Any real answer resets this.
+    let warnedSilence = false;
 
-    // Keeps listening past a silent attempt as long as the person is
-    // still visibly there (motionRef), instead of giving up on the
-    // first pause - someone reading a sign or deciding what to say
-    // shouldn't get cut off. Still bounded on both axes so it can't
-    // hang forever.
-    while (realTurns < MAX_CONVERSATION_TURNS && silentRetries < MAX_SILENT_RETRIES) {
+    // Conversation length is driven by silence/goodbye detection, not a
+    // turn count - MAX_TOTAL_TURNS is only a safety net against a truly
+    // runaway loop.
+    while (realTurns < MAX_TOTAL_TURNS) {
       // Piggyback a face-recognition attempt on every turn: if a resident
       // walks up while we're still chatting with an unidentified visitor,
       // switch straight to the welcome flow instead of recording a
@@ -287,18 +285,28 @@ export function StandbyPage() {
       const said = await listenWithMicReleased();
 
       if (!said.trim()) {
-        silentRetries++;
         if (!motionRef.current) {
           leftSilently = true;
           break; // they've actually left
         }
-        continue; // still there, listen again
+        if (!warnedSilence) {
+          warnedSilence = true;
+          const warn = 'Ainda está aí? Vou encerrar em instantes se não ouvir uma resposta.';
+          setSubtitle(warn);
+          await speak(warn);
+          continue; // give one more chance after the warning
+        }
+        leftSilently = true; // silent again right after the warning
+        break;
       }
 
+      warnedSilence = false; // they responded - reset the silence strike
       realTurns++;
       qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
       transcript.push({ role: 'user', content: said });
       setSubtitle(`Visitante: ${said}`);
+
+      const isFarewell = FAREWELL_PATTERN.test(said);
 
       try {
         const reply = await apiService.chatWithAssistant(transcript);
@@ -309,6 +317,11 @@ export function StandbyPage() {
       } catch {
         await speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
         endedWithError = true;
+        break;
+      }
+
+      if (isFarewell) {
+        saidGoodbye = true;
         break;
       }
 
@@ -347,11 +360,10 @@ export function StandbyPage() {
       return;
     }
 
-    // The loop only exits without an explicit break when the turn/retry
-    // caps were hit while the visitor was still there mid-conversation -
-    // that deserves a proper goodbye instead of the assistant just
-    // going quiet on them.
-    if (!leftSilently && !endedWithError) {
+    // Only warn-and-end-on-silence or the safety cap deserve an extra
+    // goodbye line - a farewell already got a natural reply, and the
+    // error/left-silently paths already said their piece.
+    if (!leftSilently && !endedWithError && !saidGoodbye) {
       const closing = 'Preciso encerrar por aqui, mas já registrei tudo para o morador. Obrigado pela visita!';
       setSubtitle(closing);
       await speak(closing);
