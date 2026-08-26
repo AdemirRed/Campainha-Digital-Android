@@ -26,8 +26,28 @@ Seja breve, natural e prestativo - no máximo 2 frases curtas por resposta.
 Descubra o motivo da visita e ajude com o que for preciso: entregadores, prestadores de serviço,
 vizinhos, etc. Se souberem que tipo de entrega é (Mercado Livre, iFood, Correios...), responda de
 forma útil e específica em vez de genérica.
-Nunca confirme ou negue se há alguém em casa. Ofereça sempre registrar um recado para o morador.
+Ofereça sempre registrar um recado para o morador.
 Responda sempre em português do Brasil.`;
+
+const PRESENCE_STALE_HOURS = 12;
+
+function buildPresenceInstruction(presenceRaw: string | null): string {
+  if (!presenceRaw) {
+    return 'Se perguntarem se há alguém em casa, diga que não tem certeza no momento.';
+  }
+  try {
+    const presence = JSON.parse(presenceRaw) as { text: string; updatedAt: string };
+    const ageMs = Date.now() - new Date(presence.updatedAt).getTime();
+    if (ageMs > PRESENCE_STALE_HOURS * 60 * 60 * 1000) {
+      return 'Se perguntarem se há alguém em casa, diga que não tem certeza no momento (a última atualização de status é antiga demais para confiar).';
+    }
+    return `O morador deixou este status sobre presença em casa: "${presence.text}". Se o
+visitante perguntar se há alguém em casa, use esse status para responder (parafraseando, não
+citando literalmente). Se o status não deixar claro, diga que não tem certeza.`;
+  } catch {
+    return 'Se perguntarem se há alguém em casa, diga que não tem certeza no momento.';
+  }
+}
 
 export class AssistantController {
   private eventRepo: EventRepository;
@@ -51,9 +71,15 @@ export class AssistantController {
       // Mercado Livre, o código é 1234; peça para deixar na cadeira")
       // via the admin panel, applied to every conversation.
       const customInstructions = this.settingsRepo.get('assistant_instructions');
-      const systemPrompt = customInstructions
-        ? `${BASE_VISITOR_PROMPT}\n\nInstruções do morador para você seguir:\n${customInstructions}`
-        : BASE_VISITOR_PROMPT;
+      const presenceInstruction = buildPresenceInstruction(this.settingsRepo.get('presence_status'));
+
+      const systemPrompt = [
+        BASE_VISITOR_PROMPT,
+        presenceInstruction,
+        customInstructions ? `Instruções do morador para você seguir:\n${customInstructions}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
       const reply = await chatWithOllama([{ role: 'system', content: systemPrompt }, ...messages]);
 
@@ -83,6 +109,12 @@ export class AssistantController {
         unrecognizedVisitsCount: unrecognizedVisits.length,
         lastUnrecognizedAt: lastUnrecognized?.created_at || null,
       };
+      // The actual message texts, oldest first, so the resident can ask
+      // to hear them read aloud instead of just being told a count.
+      const messageTexts = messages
+        .filter((e) => e.metadata?.message)
+        .map((e) => e.metadata!.message as string)
+        .reverse();
       const lastUnrecognizedLocalTime = lastUnrecognized ? formatLocalTime(lastUnrecognized.created_at) : null;
 
       let text: string;
@@ -110,7 +142,7 @@ Se os dois números forem zero, apenas dê boas-vindas.`,
             : `Você tem ${stats.messagesCount} ${stats.messagesCount === 1 ? 'mensagem' : 'mensagens'} e ${stats.unrecognizedVisitsCount} ${stats.unrecognizedVisitsCount === 1 ? 'visita não reconhecida' : 'visitas não reconhecidas'} nas últimas 24 horas.`;
       }
 
-      res.json({ success: true, data: { text, stats } } as ApiResponse);
+      res.json({ success: true, data: { text, stats, messages: messageTexts } } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message } as ApiResponse);
     }

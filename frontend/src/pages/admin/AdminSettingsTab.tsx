@@ -2,6 +2,16 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../../services/apiService';
 import Button from '../../components/Button';
+import { listenOnce, isSpeechRecognitionSupported } from '../../utils/voiceRecognition';
+
+function formatUpdatedAt(iso: string): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso));
+}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -26,6 +36,9 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
   const [instructions, setInstructions] = useState('');
   const [savingInstructions, setSavingInstructions] = useState(false);
 
+  const [presenceStatus, setPresenceStatus] = useState<{ text: string; updatedAt: string } | null>(null);
+  const [recordingPresence, setRecordingPresence] = useState(false);
+
   useEffect(() => {
     setLoading(true);
     apiService
@@ -35,7 +48,31 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
       .finally(() => setLoading(false));
 
     apiService.getAssistantInstructions().then(setInstructions);
+    apiService.getPresenceStatus().then(setPresenceStatus);
   }, []);
+
+  async function handleRecordPresence() {
+    if (!isSpeechRecognitionSupported()) {
+      showToast('Reconhecimento de voz não disponível neste dispositivo', 'error');
+      return;
+    }
+    setRecordingPresence(true);
+    try {
+      const said = await listenOnce();
+      if (!said.trim()) {
+        showToast('Não entendi, tente novamente', 'error');
+        return;
+      }
+      await apiService.setPresenceStatus(said);
+      const updated = await apiService.getPresenceStatus();
+      setPresenceStatus(updated);
+      showToast('Status salvo!');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao salvar status', 'error');
+    } finally {
+      setRecordingPresence(false);
+    }
+  }
 
   async function handleSaveInstructions() {
     setSavingInstructions(true);
@@ -104,6 +141,34 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
       <div className="grid grid-1" style={{ marginBottom: '24px' }}>
         <Button onClick={handleSaveInstructions} disabled={savingInstructions}>
           {savingInstructions ? 'Salvando...' : 'Salvar instruções'}
+        </Button>
+      </div>
+
+      <h2 className="mb-16" style={{ fontSize: '24px' }}>Status de presença</h2>
+      <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
+        Grave um aviso por voz (ex: "Estou saindo, volto às 21h") para o assistente responder
+        visitantes que perguntarem se há alguém em casa.
+      </p>
+      {presenceStatus && (
+        <div
+          style={{
+            padding: '12px 16px',
+            marginBottom: '16px',
+            borderRadius: '10px',
+            border: '2px solid var(--border)',
+            textAlign: 'left',
+            fontSize: '15px',
+          }}
+        >
+          <strong>"{presenceStatus.text}"</strong>
+          <div style={{ color: '#64748b', fontSize: '13px', marginTop: '4px' }}>
+            Atualizado em {formatUpdatedAt(presenceStatus.updatedAt)}
+          </div>
+        </div>
+      )}
+      <div className="grid grid-1" style={{ marginBottom: '24px' }}>
+        <Button variant="outline" onClick={handleRecordPresence} disabled={recordingPresence}>
+          {recordingPresence ? '🎙️ Ouvindo...' : '🎙️ Gravar status de presença'}
         </Button>
       </div>
 

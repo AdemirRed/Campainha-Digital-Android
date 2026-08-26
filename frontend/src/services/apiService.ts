@@ -182,8 +182,8 @@ class ApiService {
     return result.reply;
   }
 
-  async getAssistantSummary(): Promise<{ text: string; stats: any }> {
-    return this.request<{ text: string; stats: any }>('/assistant/summary');
+  async getAssistantSummary(): Promise<{ text: string; stats: any; messages?: string[] }> {
+    return this.request<{ text: string; stats: any; messages?: string[] }>('/assistant/summary');
   }
 
   // Disk usage breakdown (audios/videos/continuous/photos)
@@ -228,6 +228,28 @@ class ApiService {
 
   async setAssistantInstructions(value: string): Promise<void> {
     await this.request(`/settings/assistant_instructions`, {
+      method: 'PUT',
+      body: JSON.stringify({ value }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
+  // Resident-recorded presence status (e.g. "saí, volto às 21h"), used by
+  // the assistant to answer visitors asking if someone is home
+  async getPresenceStatus(): Promise<{ text: string; updatedAt: string } | null> {
+    try {
+      const result = await this.request<{ value: string }>('/settings/presence_status', {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      return result.value ? JSON.parse(result.value) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async setPresenceStatus(text: string): Promise<void> {
+    const value = JSON.stringify({ text, updatedAt: new Date().toISOString() });
+    await this.request(`/settings/presence_status`, {
       method: 'PUT',
       body: JSON.stringify({ value }),
       headers: { Authorization: `Bearer ${API_TOKEN}` },

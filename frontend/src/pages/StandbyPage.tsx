@@ -138,8 +138,11 @@ export function StandbyPage() {
     });
 
     let summaryText = '';
+    let pendingMessages: string[] = [];
     try {
-      summaryText = (await apiService.getAssistantSummary()).text;
+      const summary = await apiService.getAssistantSummary();
+      summaryText = summary.text;
+      pendingMessages = summary.messages || [];
     } catch {
       // no summary available - still greet normally
     }
@@ -150,13 +153,32 @@ export function StandbyPage() {
       return;
     }
 
-    speak(`Bem-vindo, ${result.resident.name}! ${summaryText}`.trim());
     setWelcomeName(result.resident.name);
+    setSubtitle(summaryText || null);
+    await speak(`Bem-vindo, ${result.resident.name}! ${summaryText}`.trim());
+
+    if (pendingMessages.length > 0 && isSpeechRecognitionSupported()) {
+      const question =
+        pendingMessages.length === 1
+          ? 'Você tem 1 recado. Quer ouvir agora?'
+          : `Você tem ${pendingMessages.length} recados. Quer ouvir agora?`;
+      setSubtitle(question);
+      await speak(question);
+      const answer = await listenOnce();
+      if (/\b(sim|quero|pode|ouvir|manda|claro)\b/i.test(answer)) {
+        for (const msg of pendingMessages) {
+          setSubtitle(msg);
+          await speak(msg);
+        }
+        await speak('Eram todos os recados.');
+      }
+    }
+
     setSubtitle(summaryText || null);
     setTimeout(() => {
       setWelcomeName(null);
       finishVisit();
-    }, 5000);
+    }, 4000);
   }
 
   // Talks to an unrecognized visitor via the AI assistant (Ollama Cloud):
@@ -181,7 +203,10 @@ export function StandbyPage() {
       return;
     }
 
-    const visitorMessages: string[] = [];
+    // Pairs of (assistant question, visitor answer) so the saved message
+    // carries context instead of just the visitor's bare replies.
+    const qaPairs: string[] = [];
+    let lastAssistantLine = opening;
     let realTurns = 0;
     let silentRetries = 0;
 
@@ -218,13 +243,14 @@ export function StandbyPage() {
       }
 
       realTurns++;
-      visitorMessages.push(said);
+      qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
       transcript.push({ role: 'user', content: said });
       setSubtitle(`Visitante: ${said}`);
 
       try {
         const reply = await apiService.chatWithAssistant(transcript);
         transcript.push({ role: 'assistant', content: reply });
+        lastAssistantLine = reply;
         setSubtitle(reply);
         await speak(reply);
       } catch {
@@ -235,8 +261,8 @@ export function StandbyPage() {
 
     if (interruptedByResidentRef.current) return;
 
-    if (visitorMessages.length > 0) {
-      apiService.sendMessage({ text: visitorMessages.join(' / ') }).catch(() => {});
+    if (qaPairs.length > 0) {
+      apiService.sendMessage({ text: qaPairs.join('\n\n') }).catch(() => {});
     }
 
     await uploadUnrecognizedClip();

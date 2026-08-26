@@ -89,7 +89,10 @@ export function CallResidentPage() {
       setSubtitle(opening);
       if (!cancelled) await speak(opening);
 
-      const visitorMessages: string[] = [];
+      // Pairs of (assistant question, visitor answer) so the saved
+      // message carries context instead of just the bare replies.
+      const qaPairs: string[] = [];
+      let lastAssistantLine = opening;
 
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TURNS && !cancelled; turn++) {
@@ -102,13 +105,14 @@ export function CallResidentPage() {
 
           if (!said.trim()) break;
 
-          visitorMessages.push(said);
+          qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
           transcript.push({ role: 'user', content: said });
           setSubtitle(`Você: ${said}`);
 
           try {
             const reply = await apiService.chatWithAssistant(transcript);
             transcript.push({ role: 'assistant', content: reply });
+            lastAssistantLine = reply;
             setSubtitle(reply);
             if (!cancelled) await speak(reply);
           } catch {
@@ -120,8 +124,8 @@ export function CallResidentPage() {
 
       if (cancelled) return;
 
-      if (visitorMessages.length > 0) {
-        apiService.sendMessage({ text: visitorMessages.join(' / ') }).catch(() => {});
+      if (qaPairs.length > 0) {
+        apiService.sendMessage({ text: qaPairs.join('\n\n') }).catch(() => {});
       }
 
       await stopRecordingSegment();
