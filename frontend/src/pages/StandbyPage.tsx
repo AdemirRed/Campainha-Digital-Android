@@ -190,7 +190,21 @@ export function StandbyPage() {
     interruptedByResidentRef.current = false;
     const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
 
-    const opening = 'Olá! Não te reconheci. Em que posso ajudar?';
+    // Check if this face belongs to someone who's visited before (e.g. a
+    // recurring delivery driver) before deciding how to greet them.
+    let knownVisitor: { id: number; name: string; notes: string | null } | null = null;
+    if (videoRef.current) {
+      try {
+        const frame = captureVideoFrameAsBase64(videoRef.current);
+        knownVisitor = await apiService.recognizeVisitor(frame);
+      } catch {
+        // no match / recognition unavailable - treat as a first-time visitor
+      }
+    }
+
+    const opening = knownVisitor
+      ? `Olá de novo, ${knownVisitor.name}!${knownVisitor.notes ? ` Da última vez: ${knownVisitor.notes}.` : ''} Como posso ajudar?`
+      : 'Olá! Não te reconheci. Em que posso ajudar?';
     transcript.push({ role: 'assistant', content: opening });
     setSubtitle(opening);
     await speak(opening); // must finish talking before listening, or the mic hears itself
@@ -209,6 +223,8 @@ export function StandbyPage() {
     let lastAssistantLine = opening;
     let realTurns = 0;
     let silentRetries = 0;
+    let identified = !!knownVisitor;
+    let nameAsked = false;
 
     // Keeps listening past a silent attempt as long as the person is
     // still visibly there (motionRef), instead of giving up on the
@@ -256,6 +272,35 @@ export function StandbyPage() {
       } catch {
         await speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
         break;
+      }
+
+      // A dialogue running this long is worth remembering - ask for a
+      // name and snap a photo so a returning visitor (e.g. a delivery
+      // driver) can be greeted by name next time instead of starting over.
+      if (!identified && !nameAsked && realTurns >= 2) {
+        nameAsked = true;
+        const askName = 'Antes de continuar, posso saber seu nome?';
+        transcript.push({ role: 'assistant', content: askName });
+        lastAssistantLine = askName;
+        setSubtitle(askName);
+        await speak(askName);
+
+        const nameSaid = await listenWithMicReleased();
+        if (nameSaid.trim() && videoRef.current) {
+          qaPairs.push(`Assistente: ${askName}\nVisitante: ${nameSaid}`);
+          transcript.push({ role: 'user', content: `Meu nome é ${nameSaid}` });
+          identified = true;
+          try {
+            const frame = captureVideoFrameAsBase64(videoRef.current);
+            await apiService.identifyVisitor({
+              name: nameSaid,
+              photoBase64: frame,
+              notes: qaPairs.join('\n'),
+            });
+          } catch {
+            // best-effort - not being able to save the profile shouldn't stop the conversation
+          }
+        }
       }
     }
 

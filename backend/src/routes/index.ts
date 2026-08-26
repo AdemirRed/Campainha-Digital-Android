@@ -37,5 +37,19 @@ export function setupRoutes(app: Express): void {
     logger.warn(`Face recognition routes disabled (dependency missing): ${err.message}`);
   }
 
+  // Visitor face identification/recognition shares the same face-api
+  // dependency as resident recognition, so it's gated the same way.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { VisitorFaceController } = require('../controllers/VisitorFaceController');
+    const visitorFaceController = new VisitorFaceController();
+    const visitorFaceRouter = Router();
+    visitorFaceRouter.post('/identify', visitorFaceController.identify.bind(visitorFaceController));
+    visitorFaceRouter.post('/recognize', visitorFaceController.recognize.bind(visitorFaceController));
+    apiRouter.use('/visitors', visitorFaceRouter);
+  } catch (err: any) {
+    logger.warn(`Visitor face recognition routes disabled (dependency missing): ${err.message}`);
+  }
+
   app.use('/api', apiRouter);
 }

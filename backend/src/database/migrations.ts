@@ -83,6 +83,21 @@ export function runMigrations(db: SqlJsDatabase): void {
         );
         CREATE INDEX IF NOT EXISTS idx_residents_is_admin ON residents(is_admin);
       `
+    },
+    {
+      name: '006_create_visitors_table',
+      sql: `
+        CREATE TABLE IF NOT EXISTS visitors (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          descriptor TEXT NOT NULL,
+          photo_path TEXT,
+          notes TEXT,
+          visit_count INTEGER NOT NULL DEFAULT 1,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `
     }
   ];
 

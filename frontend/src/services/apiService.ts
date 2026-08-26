@@ -172,6 +172,29 @@ class ApiService {
     });
   }
 
+  // Tries to match a frame against previously identified visitors (e.g. a
+  // delivery driver who's been here before)
+  async recognizeVisitor(imageBase64: string): Promise<{ id: number; name: string; notes: string | null } | null> {
+    return this.request('/visitors/recognize', {
+      method: 'POST',
+      body: JSON.stringify({ image: imageBase64 }),
+    });
+  }
+
+  // Registers (or updates, if the face already matches someone) a
+  // visitor's name + photo + what they said they needed, captured during
+  // a long conversation with the assistant
+  async identifyVisitor(data: {
+    name: string;
+    photoBase64: string;
+    notes?: string;
+  }): Promise<{ id: number; name: string }> {
+    return this.request('/visitors/identify', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // AI assistant (Ollama Cloud) - talks to unrecognized visitors and
   // summarizes recent activity for recognized residents
   async chatWithAssistant(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string> {

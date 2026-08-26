@@ -98,3 +98,36 @@ export async function matchDescriptor(
 
   return null;
 }
+
+export interface StoredVisitor {
+  id: number;
+  descriptor: number[];
+}
+
+export interface VisitorMatch<T extends StoredVisitor> {
+  visitor: T;
+  distance: number;
+}
+
+// Visitors are stored with a single descriptor each (captured once, when
+// they first give their name), unlike residents which can have several.
+export async function matchVisitorDescriptor<T extends StoredVisitor>(
+  descriptor: number[],
+  visitors: T[]
+): Promise<VisitorMatch<T> | null> {
+  await ensureModelsLoaded();
+  let best: VisitorMatch<T> | null = null;
+
+  for (const visitor of visitors) {
+    const distance = faceapi.euclideanDistance(descriptor, visitor.descriptor);
+    if (!best || distance < best.distance) {
+      best = { visitor, distance };
+    }
+  }
+
+  if (best && best.distance < MATCH_THRESHOLD) {
+    return best;
+  }
+
+  return null;
+}
