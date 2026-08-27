@@ -8,6 +8,7 @@ export const DELIVERY_COMPANIES = [
 
 export const BUTTON_OPTIONS = [
   { value: 'call', label: 'CHAMAR MORADOR', icon: '📞' },
+  { value: 'assistant', label: 'FALAR COM ASSISTENTE', icon: '🤖' },
   { value: 'delivery', label: 'ENTREGA', icon: '📦' },
   { value: 'other', label: 'OUTRO MOTIVO', icon: '💬' }
 ] as const;

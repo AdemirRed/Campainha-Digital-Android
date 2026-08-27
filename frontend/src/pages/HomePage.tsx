@@ -26,10 +26,13 @@ export function HomePage() {
   const handleButtonClick = (value: string) => {
     switch (value) {
       case 'call':
-        // Rings the resident's real devices first (RealCallPage); if
-        // nobody answers, that page offers to fall back to the AI
-        // assistant conversation instead of leaving the visitor stuck.
+        // Rings the resident's real devices (RealCallPage); if nobody
+        // answers, that page offers to fall back to the AI assistant.
         navigate('/call/real');
+        break;
+      case 'assistant':
+        // Talks straight to the AI assistant, no ringing/waiting first.
+        navigate('/call');
         break;
       case 'delivery':
         navigate('/delivery');
