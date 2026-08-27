@@ -60,7 +60,7 @@ export function AdminMessagesTab({ showToast }: { showToast: (msg: string, type?
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Mensagens recebidas</h2>
+      <h2 className="admin-section-title">Mensagens recebidas</h2>
 
       {loading && <p>Carregando...</p>}
       {!loading && messages.length === 0 && <p>Nenhuma mensagem ainda.</p>}

@@ -139,7 +139,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string, type
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Cadastrar pessoa</h2>
+      <h2 className="admin-section-title">Cadastrar pessoa</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px' }}>
         Moradores, visitantes frequentes, etc. (reconhecimento processado no servidor)
       </p>
@@ -189,7 +189,7 @@ export function AdminResidentsTab({ showToast }: { showToast: (msg: string, type
         </Button>
       </div>
 
-      <h2 className="mt-32 mb-16" style={{ fontSize: '24px' }}>Pessoas cadastradas</h2>
+      <h2 className="admin-section-title mt-32">Pessoas cadastradas</h2>
 
       {loading && <p>Carregando...</p>}
       {error && <p style={{ color: '#ef4444' }}>{error}</p>}

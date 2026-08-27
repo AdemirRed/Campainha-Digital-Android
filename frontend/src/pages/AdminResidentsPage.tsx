@@ -8,18 +8,19 @@ import AdminVisitorsTab from './admin/AdminVisitorsTab';
 import AdminDeliveriesTab from './admin/AdminDeliveriesTab';
 import AdminRecordingsTab from './admin/AdminRecordingsTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
+import '../styles/admin.css';
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234';
 
 type Tab = 'residents' | 'messages' | 'visitors' | 'deliveries' | 'recordings' | 'settings';
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: 'residents', label: '👤 Moradores' },
-  { key: 'messages', label: '💬 Mensagens' },
-  { key: 'visitors', label: '🕵️ Visitantes' },
-  { key: 'deliveries', label: '📦 Entregas' },
-  { key: 'recordings', label: '📹 Gravações 24h' },
-  { key: 'settings', label: '⚙️ Configurações' },
+const TABS: { key: Tab; icon: string; label: string }[] = [
+  { key: 'residents', icon: '👤', label: 'Moradores' },
+  { key: 'messages', icon: '💬', label: 'Mensagens' },
+  { key: 'visitors', icon: '🕵️', label: 'Visitantes' },
+  { key: 'deliveries', icon: '📦', label: 'Entregas' },
+  { key: 'recordings', icon: '📹', label: 'Gravações' },
+  { key: 'settings', icon: '⚙️', label: 'Config.' },
 ];
 
 export function AdminResidentsPage() {
@@ -68,63 +69,56 @@ export function AdminResidentsPage() {
     );
   }
 
-  return (
-    <div className="fullscreen" style={{ alignItems: 'stretch', padding: 0 }}>
-      <div
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          gap: '8px',
-          padding: '16px',
-          borderBottom: '2px solid var(--border)',
-        }}
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              flexShrink: 0,
-              padding: '10px 16px',
-              borderRadius: '999px',
-              border: tab === t.key ? '2px solid var(--primary)' : '2px solid var(--border)',
-              background: tab === t.key ? 'var(--primary)' : 'transparent',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-        <button
-          onClick={() => navigate('/')}
-          style={{
-            flexShrink: 0,
-            padding: '10px 16px',
-            borderRadius: '999px',
-            border: '2px solid var(--error)',
-            background: 'transparent',
-            color: 'var(--error)',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          🚪 Sair
-        </button>
-      </div>
+  const activeTab = TABS.find((t) => t.key === tab)!;
 
-      <div className="container" style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-        {tab === 'residents' && <AdminResidentsTab showToast={showToast} />}
-        {tab === 'messages' && <AdminMessagesTab showToast={showToast} />}
-        {tab === 'visitors' && <AdminVisitorsTab showToast={showToast} />}
-        {tab === 'deliveries' && <AdminDeliveriesTab showToast={showToast} />}
-        {tab === 'recordings' && <AdminRecordingsTab showToast={showToast} />}
-        {tab === 'settings' && <AdminSettingsTab showToast={showToast} />}
+  return (
+    <div className="admin-shell">
+      <nav className="admin-sidebar">
+        <div className="admin-brand">
+          <span className="admin-brand-icon">🔔</span>
+          <span className="admin-brand-text">Campainha Digital</span>
+        </div>
+
+        <div className="admin-nav">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              className={`admin-nav-item${tab === t.key ? ' active' : ''}`}
+              onClick={() => setTab(t.key)}
+            >
+              <span className="admin-nav-icon">{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+          <button className="admin-nav-item danger" onClick={() => navigate('/')}>
+            <span className="admin-nav-icon">🚪</span>
+            <span>Sair</span>
+          </button>
+        </div>
+
+        <div className="admin-nav-footer">
+          <div style={{ fontSize: '12px', color: 'var(--text-gray)' }}>Painel do administrador</div>
+        </div>
+      </nav>
+
+      <div className="admin-main">
+        <div className="admin-topbar">
+          <div className="admin-topbar-title">
+            <span>{activeTab.icon}</span>
+            <span>{activeTab.label}</span>
+          </div>
+        </div>
+
+        <div className="admin-content">
+          <div className="admin-content-inner">
+            {tab === 'residents' && <AdminResidentsTab showToast={showToast} />}
+            {tab === 'messages' && <AdminMessagesTab showToast={showToast} />}
+            {tab === 'visitors' && <AdminVisitorsTab showToast={showToast} />}
+            {tab === 'deliveries' && <AdminDeliveriesTab showToast={showToast} />}
+            {tab === 'recordings' && <AdminRecordingsTab showToast={showToast} />}
+            {tab === 'settings' && <AdminSettingsTab showToast={showToast} />}
+          </div>
+        </div>
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

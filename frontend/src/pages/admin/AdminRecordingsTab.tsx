@@ -59,7 +59,7 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Gravações 24h (últimos 7 dias)</h2>
+      <h2 className="admin-section-title">Gravações 24h (últimos 7 dias)</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
         Clipes de 5 minutos gravados continuamente. Os mais antigos que 7 dias são apagados
         automaticamente.

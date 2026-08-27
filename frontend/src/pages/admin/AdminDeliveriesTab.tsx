@@ -45,7 +45,7 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Entregas registradas</h2>
+      <h2 className="admin-section-title">Entregas registradas</h2>
 
       {loading && <p>Carregando...</p>}
       {!loading && deliveries.length === 0 && <p>Nenhuma entrega ainda.</p>}

@@ -41,7 +41,7 @@ export function AdminVisitorsTab({ showToast }: { showToast: (msg: string, type?
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Visitantes não reconhecidos</h2>
+      <h2 className="admin-section-title">Visitantes não reconhecidos</h2>
 
       {loading && <p>Carregando...</p>}
       {!loading && visits.length === 0 && <p>Nenhum registro ainda.</p>}

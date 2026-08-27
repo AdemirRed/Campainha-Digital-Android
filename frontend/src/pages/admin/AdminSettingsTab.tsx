@@ -88,7 +88,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
 
   return (
     <div>
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Armazenamento</h2>
+      <h2 className="admin-section-title">Armazenamento</h2>
 
       {loading && <p>Carregando...</p>}
       {error && <p style={{ color: '#ef4444' }}>{error}</p>}
@@ -115,7 +115,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
         </div>
       )}
 
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Instruções para o assistente</h2>
+      <h2 className="admin-section-title">Instruções para o assistente</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
         O que a IA deve dizer para visitantes específicos, ex: "Se for entrega do Mercado Livre, o
         código é 1234. Peça para o entregador deixar o pacote na cadeira da varanda."
@@ -144,7 +144,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
         </Button>
       </div>
 
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Status de presença</h2>
+      <h2 className="admin-section-title">Status de presença</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
         Grave um aviso por voz (ex: "Estou saindo, volto às 21h") para o assistente responder
         visitantes que perguntarem se há alguém em casa.
@@ -172,7 +172,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
         </Button>
       </div>
 
-      <h2 className="mb-16" style={{ fontSize: '24px' }}>Notificações</h2>
+      <h2 className="admin-section-title">Notificações</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>
         Abra esta tela num segundo aparelho para ouvir um aviso toda vez que alguém tocar a
         campainha.
