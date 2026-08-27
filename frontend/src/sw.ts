@@ -20,10 +20,11 @@ self.addEventListener('push', (event) => {
 
   if (data.type !== 'incoming-call') return;
 
-  const title = `📞 ${data.callerLabel || 'Campainha'} está chamando`;
+  const label = data.callerLabel || 'Campainha';
+  const title = label === 'Campainha' ? '📞 Alguém está na porta' : `📞 ${label} está na porta`;
   event.waitUntil(
     self.registration.showNotification(title, {
-      body: 'Toque para atender',
+      body: 'Tocou a campainha - toque para atender',
       icon: '/pwa-192x192.png',
       badge: '/pwa-192x192.png',
       tag: `call-${data.callId}`,

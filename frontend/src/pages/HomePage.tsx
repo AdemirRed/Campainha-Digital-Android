@@ -26,7 +26,10 @@ export function HomePage() {
   const handleButtonClick = (value: string) => {
     switch (value) {
       case 'call':
-        navigate('/call');
+        // Rings the resident's real devices first (RealCallPage); if
+        // nobody answers, that page offers to fall back to the AI
+        // assistant conversation instead of leaving the visitor stuck.
+        navigate('/call/real');
         break;
       case 'delivery':
         navigate('/delivery');
@@ -47,29 +50,21 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-1">
-          <Button
-            icon="📞"
-            variant="primary"
-            onClick={() => navigate('/call/real')}
-          >
-            LIGAR PARA O MORADOR
-            {residentsOnline !== null && (
-              <span style={{ display: 'block', fontSize: '13px', fontWeight: 400, marginTop: '2px' }}>
-                {residentsOnline > 0
-                  ? `🟢 ${residentsOnline} dispositivo(s) com a tela aberta agora`
-                  : '📳 toca em todo dispositivo cadastrado, mesmo fechado'}
-              </span>
-            )}
-          </Button>
-
           {BUTTON_OPTIONS.map((option) => (
             <Button
               key={option.value}
               icon={option.icon}
               onClick={() => handleButtonClick(option.value)}
-              variant="outline"
+              variant={option.value === 'call' ? 'primary' : 'outline'}
             >
               {option.label}
+              {option.value === 'call' && residentsOnline !== null && (
+                <span style={{ display: 'block', fontSize: '13px', fontWeight: 400, marginTop: '2px' }}>
+                  {residentsOnline > 0
+                    ? `🟢 ${residentsOnline} dispositivo(s) com a tela aberta agora`
+                    : '📳 toca em todo dispositivo cadastrado, mesmo fechado'}
+                </span>
+              )}
             </Button>
           ))}
         </div>

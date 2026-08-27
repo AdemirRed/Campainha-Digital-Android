@@ -44,49 +44,28 @@ export function AdminVisitorsTab({ showToast }: { showToast: (msg: string, type?
       <h2 className="admin-section-title">Visitantes não reconhecidos</h2>
 
       {loading && <p>Carregando...</p>}
-      {!loading && visits.length === 0 && <p>Nenhum registro ainda.</p>}
+      {!loading && visits.length === 0 && <div className="admin-empty">Nenhum registro ainda.</div>}
 
-      {visits.map((event) => (
-        <div
-          key={event.id}
-          style={{
-            padding: '12px 16px',
-            marginBottom: '10px',
-            borderRadius: '10px',
-            border: '2px solid var(--border)',
-            textAlign: 'left',
-          }}
-        >
-          <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
-            {new Date(event.created_at).toLocaleString('pt-BR')}
-          </div>
-          {event.metadata?.videoFile && (
-            <video
-              controls
-              src={`${STORAGE_BASE_URL}/storage/videos/${event.metadata.videoFile}`}
-              style={{ width: '100%', maxWidth: '400px' }}
-            />
-          )}
-          <div>
+      <div className="admin-video-grid">
+        {visits.map((event) => (
+          <div key={event.id} className="admin-card">
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+              {new Date(event.created_at).toLocaleString('pt-BR')}
+            </div>
+            {event.metadata?.videoFile && (
+              <video controls src={`${STORAGE_BASE_URL}/storage/videos/${event.metadata.videoFile}`} />
+            )}
             <button
+              className="admin-btn admin-btn-danger"
               onClick={() => handleDelete(event)}
               disabled={deletingId === event.id}
-              style={{
-                background: 'transparent',
-                border: '2px solid var(--error)',
-                color: 'var(--error)',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                marginTop: '8px',
-              }}
+              style={{ marginTop: '8px' }}
             >
               {deletingId === event.id ? '...' : '🗑️ Remover'}
             </button>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

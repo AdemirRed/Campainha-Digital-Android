@@ -90,44 +90,21 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
           </button>
 
           {expandedDay === day && (
-            <div style={{ marginTop: '8px' }}>
+            <div className="admin-video-grid" style={{ marginTop: '8px' }}>
               {dayRecordings.map((rec) => (
-                <div
-                  key={rec.filename}
-                  style={{
-                    padding: '10px 14px',
-                    marginBottom: '8px',
-                    borderRadius: '8px',
-                    border: '2px solid var(--border)',
-                    textAlign: 'left',
-                  }}
-                >
+                <div key={rec.filename} className="admin-card">
                   <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
                     {new Date(rec.createdAt).toLocaleTimeString('pt-BR')} · {formatBytes(rec.size)}
                   </div>
-                  <video
-                    controls
-                    src={`${STORAGE_BASE_URL}/storage/continuous/${rec.filename}`}
-                    style={{ width: '100%', maxWidth: '400px' }}
-                  />
-                  <div>
-                    <button
-                      onClick={() => handleDelete(rec.filename)}
-                      disabled={deletingFile === rec.filename}
-                      style={{
-                        background: 'transparent',
-                        border: '2px solid var(--error)',
-                        color: 'var(--error)',
-                        borderRadius: '8px',
-                        padding: '6px 12px',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        marginTop: '8px',
-                      }}
-                    >
-                      {deletingFile === rec.filename ? '...' : '🗑️ Apagar'}
-                    </button>
-                  </div>
+                  <video controls src={`${STORAGE_BASE_URL}/storage/continuous/${rec.filename}`} />
+                  <button
+                    className="admin-btn admin-btn-danger"
+                    onClick={() => handleDelete(rec.filename)}
+                    disabled={deletingFile === rec.filename}
+                    style={{ marginTop: '8px' }}
+                  >
+                    {deletingFile === rec.filename ? '...' : '🗑️ Apagar'}
+                  </button>
                 </div>
               ))}
             </div>

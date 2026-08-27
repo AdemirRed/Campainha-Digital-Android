@@ -30,17 +30,13 @@ export class SettingsController {
       const key = req.params.key;
       const value = this.settingsRepo.get(key);
 
-      if (value === null) {
-        res.status(404).json({
-          success: false,
-          error: 'Setting not found'
-        } as ApiResponse);
-        return;
-      }
-
+      // A setting simply not having been configured yet (e.g. the resident
+      // never recorded a presence status) is a normal state, not an
+      // error - respond 200 with a null value instead of 404 so it
+      // doesn't show up as a failed request for callers just checking.
       res.json({
         success: true,
-        data: { key, value }
+        data: { key, value: value === null ? null : value }
       } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({

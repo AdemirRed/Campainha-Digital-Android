@@ -6,6 +6,7 @@ import { subscribeToPush } from '../utils/pushNotifications';
 import { CallSignalingClient } from '../utils/callSignaling';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
 import { startRingtone, stopRingtone } from '../utils/ringtone';
+import { ChatTranscript } from '../components/ChatTranscript';
 
 const POLL_INTERVAL_MS = 4000;
 const LIVE_POLL_INTERVAL_MS = 2000;
@@ -46,33 +47,6 @@ function describeEvent(event: Event): string | null {
   return null;
 }
 
-// The assistant conversation is saved as alternating "Assistente: ...\nVisitante: ..."
-// pairs joined by blank lines - render that as readable chat lines instead
-// of one giant unbroken paragraph.
-function MessageBody({ text }: { text: string }) {
-  const lines = text.split('\n').filter(Boolean);
-  return (
-    <div style={{ marginTop: '6px' }}>
-      {lines.map((line, i) => {
-        const isAssistant = line.startsWith('Assistente:');
-        const isVisitor = line.startsWith('Visitante:');
-        return (
-          <div
-            key={i}
-            style={{
-              fontSize: '14px',
-              lineHeight: 1.5,
-              color: isAssistant ? '#94a3b8' : isVisitor ? 'var(--text-light, #e2e8f0)' : undefined,
-              fontWeight: isVisitor ? 600 : 400,
-            }}
-          >
-            {line}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 function playBeep() {
   try {
@@ -207,9 +181,12 @@ export function NotificationsPage() {
 
     client.on('incoming-call', (msg) => {
       pendingCallRef.current = { callId: msg.callId, from: msg.from || 'kiosk' };
-      setCallerLabel(msg.callerLabel || 'Campainha');
+      const label = msg.callerLabel || 'Campainha';
+      setCallerLabel(label);
       setCallPhase('ringing');
       startRingtone();
+      // Announce who it is (if recognized) instead of just a generic tone.
+      speak(label === 'Campainha' ? 'Alguém está na porta e tocou a campainha' : `${label} está na porta e tocou a campainha`);
     });
 
     client.on('call-offer', async (msg) => {
@@ -453,7 +430,7 @@ export function NotificationsPage() {
             <div>
               <span style={{ color: '#64748b' }}>{item.time}</span> — {item.text}
             </div>
-            {item.event.metadata?.message && <MessageBody text={item.event.metadata.message as string} />}
+            {item.event.metadata?.message && <ChatTranscript text={item.event.metadata.message as string} />}
             {item.event.metadata?.videoFile && (
               <video
                 controls

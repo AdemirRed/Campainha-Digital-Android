@@ -294,10 +294,10 @@ class ApiService {
   // follow in every conversation (e.g. delivery codes, where to leave packages)
   async getAssistantInstructions(): Promise<string> {
     try {
-      const result = await this.request<{ value: string }>('/settings/assistant_instructions', {
+      const result = await this.request<{ value: string | null }>('/settings/assistant_instructions', {
         headers: { Authorization: `Bearer ${API_TOKEN}` },
       });
-      return result.value;
+      return result.value || '';
     } catch {
       return '';
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
+import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { CallSignalingClient } from '../utils/callSignaling';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
 import Button from '../components/Button';
@@ -8,6 +9,10 @@ import Button from '../components/Button';
 type Phase = 'preparing' | 'ringing' | 'connecting' | 'connected' | 'rejected' | 'no-answer' | 'ended' | 'error';
 
 const RING_TIMEOUT_MS = 30000;
+// If nobody answers the real call within this long, drop the visitor
+// into the AI assistant conversation automatically instead of leaving
+// them standing at a dead screen.
+const AUTO_FALLBACK_MS = 8000;
 
 // The kiosk side of a real WebRTC call to a resident's phone/PC - unlike
 // the AI assistant conversation, this rings an actual device and
@@ -52,6 +57,19 @@ export function RealCallPage() {
         return;
       }
 
+      // Try to recognize who's calling so the resident's device announces
+      // a name ("Ademir está na porta") instead of a generic ring.
+      let callerLabel = 'Campainha';
+      try {
+        if (videoRef.current) {
+          const frame = captureVideoFrameAsBase64(videoRef.current);
+          const match = await apiService.recognizeFace(frame);
+          if (match) callerLabel = match.resident.name;
+        }
+      } catch {
+        // no face in frame / recognition unavailable - ring generically
+      }
+
       client = new CallSignalingClient('kiosk', 'Campainha');
       client.connect();
 
@@ -90,7 +108,7 @@ export function RealCallPage() {
       });
 
       try {
-        const result = await apiService.ringResidentDevices('Campainha');
+        const result = await apiService.ringResidentDevices(callerLabel);
         if (cancelled) return;
         callId = result.callId;
         setPhase('ringing');
@@ -141,6 +159,15 @@ export function RealCallPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Nobody picked up the real call - don't strand the visitor on a dead
+  // screen, offer to talk to the AI assistant instead (same as before
+  // this feature existed), with an automatic fallback if they don't tap.
+  useEffect(() => {
+    if (phase !== 'no-answer' && phase !== 'rejected') return;
+    const timer = setTimeout(() => navigate('/call'), AUTO_FALLBACK_MS);
+    return () => clearTimeout(timer);
+  }, [phase, navigate]);
+
   function hangUp() {
     navigate('/home');
   }
@@ -155,6 +182,8 @@ export function RealCallPage() {
     ended: 'Chamada encerrada',
     error: errorMsg || 'Erro na chamada',
   };
+
+  const offerAssistantFallback = phase === 'no-answer' || phase === 'rejected';
 
   return (
     <div className="fullscreen">
@@ -179,8 +208,18 @@ export function RealCallPage() {
           {phase === 'connected' ? '📞' : phase === 'ringing' || phase === 'connecting' ? '📳' : '☎️'}
         </div>
         <h1 className="mb-24">{phaseText[phase]}</h1>
+        {offerAssistantFallback && (
+          <p style={{ marginTop: '-12px', marginBottom: '20px' }}>
+            Falando com o assistente virtual em instantes...
+          </p>
+        )}
 
         <div className="grid grid-1">
+          {offerAssistantFallback && (
+            <Button variant="primary" onClick={() => navigate('/call')}>
+              🤖 Falar com assistente agora
+            </Button>
+          )}
           <Button variant="outline" onClick={hangUp}>
             {phase === 'connected' ? '📴 Encerrar' : '← Cancelar'}
           </Button>

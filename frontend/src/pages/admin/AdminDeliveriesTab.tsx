@@ -48,58 +48,41 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
       <h2 className="admin-section-title">Entregas registradas</h2>
 
       {loading && <p>Carregando...</p>}
-      {!loading && deliveries.length === 0 && <p>Nenhuma entrega ainda.</p>}
+      {!loading && deliveries.length === 0 && <div className="admin-empty">Nenhuma entrega ainda.</div>}
 
-      {deliveries.map((delivery) => (
-        <div
-          key={delivery.id}
-          style={{
-            padding: '12px 16px',
-            marginBottom: '10px',
-            borderRadius: '10px',
-            border: '2px solid var(--border)',
-            textAlign: 'left',
-          }}
-        >
-          <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
-            {new Date(delivery.created_at).toLocaleString('pt-BR')}
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>
-            {companyLabel(delivery.company)}
-          </div>
-          {delivery.tracking_code && (
-            <div style={{ fontSize: '15px', marginBottom: '4px' }}>Código: {delivery.tracking_code}</div>
-          )}
-          {delivery.notes && (
-            <div style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '4px' }}>{delivery.notes}</div>
-          )}
-          {delivery.photo_path && (
-            <img
-              src={`${STORAGE_BASE_URL}/storage/photos/${delivery.photo_path}`}
-              alt="Foto da entrega"
-              style={{ width: '100%', maxWidth: '300px', marginTop: '8px', borderRadius: '8px' }}
-            />
-          )}
-          <div>
+      <div className="admin-video-grid">
+        {deliveries.map((delivery) => (
+          <div key={delivery.id} className="admin-card">
+            <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+              {new Date(delivery.created_at).toLocaleString('pt-BR')}
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '4px' }}>
+              {companyLabel(delivery.company)}
+            </div>
+            {delivery.tracking_code && (
+              <div style={{ fontSize: '15px', marginBottom: '4px' }}>Código: {delivery.tracking_code}</div>
+            )}
+            {delivery.notes && (
+              <div style={{ fontSize: '15px', color: '#94a3b8', marginBottom: '4px' }}>{delivery.notes}</div>
+            )}
+            {delivery.photo_path && (
+              <img
+                src={`${STORAGE_BASE_URL}/storage/photos/${delivery.photo_path}`}
+                alt="Foto da entrega"
+                style={{ marginTop: '8px' }}
+              />
+            )}
             <button
+              className="admin-btn admin-btn-danger"
               onClick={() => handleDelete(delivery)}
               disabled={deletingId === delivery.id}
-              style={{
-                background: 'transparent',
-                border: '2px solid var(--error)',
-                color: 'var(--error)',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '14px',
-                cursor: 'pointer',
-                marginTop: '8px',
-              }}
+              style={{ marginTop: '8px' }}
             >
               {deletingId === delivery.id ? '...' : '🗑️ Remover'}
             </button>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
