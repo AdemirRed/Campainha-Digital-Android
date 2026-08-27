@@ -10,6 +10,18 @@ import { startRingtone, stopRingtone } from '../utils/ringtone';
 const POLL_INTERVAL_MS = 4000;
 const LIVE_POLL_INTERVAL_MS = 2000;
 const DEVICE_LABEL_KEY = 'campainha_device_label';
+const ACTIVE_KEY = 'campainha_notifications_active';
+
+function wasActivatedBefore(): boolean {
+  // Browsers require an explicit click to grant Notification permission -
+  // once that's done, remember it so future visits don't need the click
+  // again. If permission got revoked since, fall back to asking again.
+  return (
+    localStorage.getItem(ACTIVE_KEY) === '1' &&
+    typeof Notification !== 'undefined' &&
+    Notification.permission === 'granted'
+  );
+}
 
 type CallPhase = 'idle' | 'ringing' | 'connecting' | 'connected' | 'ended';
 
@@ -21,13 +33,45 @@ function describeEvent(event: Event): string | null {
     return 'Visitante não identificado na porta';
   }
   if (event.type === EventType.BUTTON_PRESSED && event.metadata?.reason === 'other') {
-    return event.metadata?.message ? `Recado: "${event.metadata.message}"` : 'Novo recado de áudio na porta';
+    if (!event.metadata?.message) return 'Novo recado de áudio na porta';
+    // A full assistant/visitor transcript is long - the banner/history
+    // line just gets a short preview, the full text renders formatted below.
+    const preview = (event.metadata.message as string).replace(/\s+/g, ' ').slice(0, 70);
+    return `Recado: "${preview}${preview.length === 70 ? '...' : ''}"`;
   }
   if (event.type === EventType.DELIVERY_SELECTED) {
     const company = event.metadata?.company;
     return company ? `Entrega registrada na porta (${company})` : 'Entrega registrada na porta';
   }
   return null;
+}
+
+// The assistant conversation is saved as alternating "Assistente: ...\nVisitante: ..."
+// pairs joined by blank lines - render that as readable chat lines instead
+// of one giant unbroken paragraph.
+function MessageBody({ text }: { text: string }) {
+  const lines = text.split('\n').filter(Boolean);
+  return (
+    <div style={{ marginTop: '6px' }}>
+      {lines.map((line, i) => {
+        const isAssistant = line.startsWith('Assistente:');
+        const isVisitor = line.startsWith('Visitante:');
+        return (
+          <div
+            key={i}
+            style={{
+              fontSize: '14px',
+              lineHeight: 1.5,
+              color: isAssistant ? '#94a3b8' : isVisitor ? 'var(--text-light, #e2e8f0)' : undefined,
+              fontWeight: isVisitor ? 600 : 400,
+            }}
+          >
+            {line}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function playBeep() {
@@ -59,7 +103,7 @@ function getDeviceLabel(): string {
 }
 
 export function NotificationsPage() {
-  const [active, setActive] = useState(false);
+  const [active, setActive] = useState(wasActivatedBefore);
   const [banner, setBanner] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const [live, setLive] = useState<{ label: string; frameBase64: string } | null>(null);
@@ -280,7 +324,10 @@ export function NotificationsPage() {
             com a aba fechada, se você permitir notificações.
           </p>
           <button
-            onClick={() => setActive(true)}
+            onClick={() => {
+              localStorage.setItem(ACTIVE_KEY, '1');
+              setActive(true);
+            }}
             className="btn btn-primary"
           >
             Ativar notificações
@@ -406,6 +453,7 @@ export function NotificationsPage() {
             <div>
               <span style={{ color: '#64748b' }}>{item.time}</span> — {item.text}
             </div>
+            {item.event.metadata?.message && <MessageBody text={item.event.metadata.message as string} />}
             {item.event.metadata?.videoFile && (
               <video
                 controls

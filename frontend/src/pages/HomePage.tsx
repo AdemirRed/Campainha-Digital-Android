@@ -56,8 +56,8 @@ export function HomePage() {
             {residentsOnline !== null && (
               <span style={{ display: 'block', fontSize: '13px', fontWeight: 400, marginTop: '2px' }}>
                 {residentsOnline > 0
-                  ? `🟢 ${residentsOnline} dispositivo(s) online agora`
-                  : '⚪ nenhum dispositivo online agora (ainda toca, se notificações estiverem ativadas)'}
+                  ? `🟢 ${residentsOnline} dispositivo(s) com a tela aberta agora`
+                  : '📳 toca em todo dispositivo cadastrado, mesmo fechado'}
               </span>
             )}
           </Button>
