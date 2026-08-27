@@ -104,6 +104,19 @@ export function runMigrations(db: SqlJsDatabase): void {
       sql: `
         ALTER TABLE deliveries ADD COLUMN photo_path TEXT;
       `
+    },
+    {
+      name: '008_create_push_subscriptions_table',
+      sql: `
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          endpoint TEXT NOT NULL UNIQUE,
+          p256dh TEXT NOT NULL,
+          auth TEXT NOT NULL,
+          device_label TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `
     }
   ];
 

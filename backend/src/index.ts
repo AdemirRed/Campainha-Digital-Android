@@ -3,11 +3,13 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
+import http from 'http';
 import { setupMiddleware } from './middleware';
 import { setupRoutes } from './routes';
 import { Database } from './database';
 import { logger } from './utils/logger';
 import { ensureDirectories } from './utils/filesystem';
+import { attachSignalingServer } from './services/CallSignalingService';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -99,8 +101,13 @@ async function startServer() {
     });
   });
 
-  // Start server
-  app.listen(PORT, () => {
+  // Start server - a plain http.Server so the WebRTC call signaling
+  // WebSocket server (wss://.../ws/calls) can share the same port/TLS
+  // termination instead of needing a separate listener.
+  const server = http.createServer(app);
+  attachSignalingServer(server);
+
+  server.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });

@@ -2,9 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { apiService, STORAGE_BASE_URL } from '../services/apiService';
 import { Event, EventType } from '@shared/types/event';
 import { speak } from '../utils/speech';
+import { subscribeToPush } from '../utils/pushNotifications';
+import { CallSignalingClient } from '../utils/callSignaling';
+import { ICE_SERVERS } from '../utils/webrtcConfig';
+import { startRingtone, stopRingtone } from '../utils/ringtone';
 
 const POLL_INTERVAL_MS = 4000;
 const LIVE_POLL_INTERVAL_MS = 2000;
+const DEVICE_LABEL_KEY = 'campainha_device_label';
+
+type CallPhase = 'idle' | 'ringing' | 'connecting' | 'connected' | 'ended';
 
 function describeEvent(event: Event): string | null {
   if (event.type === EventType.RESIDENT_IDENTIFIED) {
@@ -42,12 +49,30 @@ function playBeep() {
   }
 }
 
+function getDeviceLabel(): string {
+  let label = localStorage.getItem(DEVICE_LABEL_KEY);
+  if (!label) {
+    label = /Mobi|Android/i.test(navigator.userAgent) ? 'Celular' : 'PC';
+    localStorage.setItem(DEVICE_LABEL_KEY, label);
+  }
+  return label;
+}
+
 export function NotificationsPage() {
   const [active, setActive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const [live, setLive] = useState<{ label: string; frameBase64: string } | null>(null);
   const lastSeenIdRef = useRef<number | null>(null);
+
+  // Real WebRTC call state - this device being rung by the kiosk.
+  const [callPhase, setCallPhase] = useState<CallPhase>('idle');
+  const [callerLabel, setCallerLabel] = useState('Campainha');
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const signalingRef = useRef<CallSignalingClient | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const pendingCallRef = useRef<{ callId: string; from: string } | null>(null);
 
   // Not a WebRTC call - a near-live JPEG feed the kiosk pushes while a
   // delivery person or a known-but-not-a-resident visitor is at the door.
@@ -122,6 +147,126 @@ export function NotificationsPage() {
     };
   }, [active]);
 
+  // Real call signaling - a persistent WebSocket connection kept open
+  // while this device has notifications active, plus a Web Push
+  // subscription so it still rings if this tab gets closed.
+  useEffect(() => {
+    if (!active) return;
+
+    subscribeToPush(getDeviceLabel()).catch(() => {
+      // push unsupported/denied - WS-based ringing still works while this tab is open
+    });
+
+    const client = new CallSignalingClient('resident', getDeviceLabel());
+    signalingRef.current = client;
+    client.connect();
+
+    client.on('incoming-call', (msg) => {
+      pendingCallRef.current = { callId: msg.callId, from: msg.from || 'kiosk' };
+      setCallerLabel(msg.callerLabel || 'Campainha');
+      setCallPhase('ringing');
+      startRingtone();
+    });
+
+    client.on('call-offer', async (msg) => {
+      if (!pcRef.current || !pendingCallRef.current || msg.callId !== pendingCallRef.current.callId) return;
+      try {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+        const answer = await pcRef.current.createAnswer();
+        await pcRef.current.setLocalDescription(answer);
+        client.send({ type: 'call-answer', to: msg.from, callId: msg.callId, sdp: answer });
+      } catch {
+        // negotiation failed - hang up cleanly
+        endCall();
+      }
+    });
+
+    client.on('ice-candidate', (msg) => {
+      if (!pcRef.current || !pendingCallRef.current || msg.callId !== pendingCallRef.current.callId) return;
+      pcRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
+    });
+
+    client.on('call-end', (msg) => {
+      if (!pendingCallRef.current || msg.callId !== pendingCallRef.current.callId) return;
+      endCall();
+    });
+
+    return () => {
+      client.close();
+      signalingRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  function endCall() {
+    stopRingtone();
+    pcRef.current?.close();
+    pcRef.current = null;
+    localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    localStreamRef.current = null;
+    pendingCallRef.current = null;
+    setCallPhase((prev) => (prev === 'idle' ? prev : 'ended'));
+    setTimeout(() => setCallPhase('idle'), 2000);
+  }
+
+  async function acceptCall() {
+    const pending = pendingCallRef.current;
+    const client = signalingRef.current;
+    if (!pending || !client) return;
+
+    stopRingtone();
+    setCallPhase('connecting');
+
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = localStream;
+
+      const pc = new RTCPeerConnection(ICE_SERVERS);
+      pcRef.current = pc;
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          client.send({ type: 'ice-candidate', to: pending.from, callId: pending.callId, candidate: event.candidate });
+        }
+      };
+      pc.ontrack = (event) => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0];
+          remoteVideoRef.current.play().catch(() => {});
+        }
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') setCallPhase('connected');
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') endCall();
+      };
+
+      client.send({ type: 'accept-call', to: pending.from, callId: pending.callId });
+    } catch {
+      endCall();
+    }
+  }
+
+  function rejectCall() {
+    const pending = pendingCallRef.current;
+    const client = signalingRef.current;
+    if (pending && client) {
+      client.send({ type: 'reject-call', to: pending.from, callId: pending.callId });
+    }
+    stopRingtone();
+    pendingCallRef.current = null;
+    setCallPhase('idle');
+  }
+
+  function hangUp() {
+    const pending = pendingCallRef.current;
+    const client = signalingRef.current;
+    if (pending && client) {
+      client.send({ type: 'call-end', to: pending.from, callId: pending.callId });
+    }
+    endCall();
+  }
+
   if (!active) {
     return (
       <div className="fullscreen">
@@ -130,7 +275,9 @@ export function NotificationsPage() {
           <h1 className="mb-24">Notificações da Campainha</h1>
           <p className="mb-24">
             Deixe esta aba aberta e visível neste dispositivo para receber um aviso sonoro toda vez
-            que alguém tocar a campainha, deixar um recado, ou for detectado na porta.
+            que alguém tocar a campainha, deixar um recado, ou for detectado na porta. Depois de
+            ativar, este dispositivo também toca quando alguém liga de verdade da porta - mesmo
+            com a aba fechada, se você permitir notificações.
           </p>
           <button
             onClick={() => setActive(true)}
@@ -138,6 +285,47 @@ export function NotificationsPage() {
           >
             Ativar notificações
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Ringing / in-call overlay takes over the whole screen, like a real phone call.
+  if (callPhase !== 'idle') {
+    return (
+      <div className="fullscreen" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            borderRadius: '16px',
+            marginBottom: '20px',
+            border: '3px solid var(--border)',
+            display: callPhase === 'connected' || callPhase === 'connecting' ? 'block' : 'none',
+          }}
+        />
+        <div className="container text-center">
+          <div className="icon mb-24">{callPhase === 'ringing' ? '📞' : callPhase === 'connected' ? '🟢' : '📴'}</div>
+          <h1 className="mb-24">
+            {callPhase === 'ringing' && `${callerLabel} está chamando`}
+            {callPhase === 'connecting' && 'Conectando...'}
+            {callPhase === 'connected' && 'Em chamada'}
+            {callPhase === 'ended' && 'Chamada encerrada'}
+          </h1>
+
+          {callPhase === 'ringing' && (
+            <div className="grid grid-2">
+              <button className="btn btn-success" onClick={acceptCall}>✅ Atender</button>
+              <button className="btn btn-outline" onClick={rejectCall}>❌ Recusar</button>
+            </div>
+          )}
+
+          {(callPhase === 'connecting' || callPhase === 'connected') && (
+            <button className="btn btn-outline" onClick={hangUp}>📴 Encerrar</button>
+          )}
         </div>
       </div>
     );

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInactivityTimer } from '../hooks/useInactivityTimer';
+import { apiService } from '../services/apiService';
 import { BUTTON_OPTIONS } from '@shared/constants';
 import Button from '../components/Button';
 import Tutorial, { useTutorial } from '../components/Tutorial';
@@ -7,6 +9,14 @@ import Tutorial, { useTutorial } from '../components/Tutorial';
 export function HomePage() {
   const navigate = useNavigate();
   const { show: showTutorial, dismiss: dismissTutorial } = useTutorial();
+  const [residentsOnline, setResidentsOnline] = useState<number | null>(null);
+
+  useEffect(() => {
+    apiService
+      .getCallPresence()
+      .then((r) => setResidentsOnline(r.residentsOnline))
+      .catch(() => setResidentsOnline(null));
+  }, []);
 
   // Return to standby after 30 seconds of inactivity
   useInactivityTimer(() => {
@@ -37,12 +47,27 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-1">
+          <Button
+            icon="📞"
+            variant="primary"
+            onClick={() => navigate('/call/real')}
+          >
+            LIGAR PARA O MORADOR
+            {residentsOnline !== null && (
+              <span style={{ display: 'block', fontSize: '13px', fontWeight: 400, marginTop: '2px' }}>
+                {residentsOnline > 0
+                  ? `🟢 ${residentsOnline} dispositivo(s) online agora`
+                  : '⚪ nenhum dispositivo online agora (ainda toca, se notificações estiverem ativadas)'}
+              </span>
+            )}
+          </Button>
+
           {BUTTON_OPTIONS.map((option) => (
             <Button
               key={option.value}
               icon={option.icon}
               onClick={() => handleButtonClick(option.value)}
-              variant={option.value === 'call' ? 'primary' : 'outline'}
+              variant="outline"
             >
               {option.label}
             </Button>

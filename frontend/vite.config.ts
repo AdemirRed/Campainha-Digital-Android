@@ -13,6 +13,12 @@ export default defineConfig({
     ...(!isTermux ? [
       VitePWA({
         registerType: 'autoUpdate',
+        // injectManifest (not the default generateSW) so src/sw.ts can add
+        // custom push/notificationclick handlers - needed to ring a
+        // resident's device even with the site closed.
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.ts',
         includeAssets: ['favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
         manifest: {
           name: 'Campainha Digital Inteligente',
@@ -42,29 +48,8 @@ export default defineConfig({
             }
           ]
         },
-        workbox: {
+        injectManifest: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-          inlineWorkboxRuntime: true,
-          sourcemap: false,
-          mode: 'production',
-          skipWaiting: true,
-          clientsClaim: true,
-          runtimeCaching: [
-            {
-              urlPattern: /^http:\/\/localhost:3000\/api\/.*/i,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'api-cache',
-                expiration: {
-                  maxEntries: 50,
-                  maxAgeSeconds: 60 * 5
-                },
-                cacheableResponse: {
-                  statuses: [0, 200]
-                }
-              }
-            }
-          ]
         },
         devOptions: {
           enabled: false

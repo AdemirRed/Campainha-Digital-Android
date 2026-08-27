@@ -101,6 +101,38 @@ class ApiService {
     await this.request('/live/stop', { method: 'POST' });
   }
 
+  // Real calls: Web Push (rings even with the tab closed) + WebSocket
+  // signaling (see utils/callSignaling.ts) for the live WebRTC exchange.
+  async getVapidPublicKey(): Promise<string | null> {
+    const result = await this.request<{ publicKey: string | null }>('/push/vapid-public-key');
+    return result.publicKey;
+  }
+
+  async subscribePush(subscription: PushSubscriptionJSON, deviceLabel: string): Promise<void> {
+    await this.request('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription, deviceLabel }),
+    });
+  }
+
+  async unsubscribePush(endpoint: string): Promise<void> {
+    await this.request('/push/unsubscribe', {
+      method: 'POST',
+      body: JSON.stringify({ endpoint }),
+    });
+  }
+
+  async ringResidentDevices(callerLabel: string): Promise<{ callId: string }> {
+    return this.request('/push/ring', {
+      method: 'POST',
+      body: JSON.stringify({ callerLabel }),
+    });
+  }
+
+  async getCallPresence(): Promise<{ residentsOnline: number }> {
+    return this.request('/push/presence');
+  }
+
   // Settings (requires auth)
   async getSettings(token: string): Promise<any> {
     return this.request<any>('/settings', {
