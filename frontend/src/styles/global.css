@@ -424,6 +424,23 @@ input:focus {
   }
 }
 
+/* "Flash" mode: while the camera is actively trying to recognize a face
+   in the dark, flipping the screen to bright white acts like a flashlight
+   pointed at the visitor, giving the camera more light to expose with. */
+.kiosk-bright {
+  background: #f8fafc !important;
+  color: #0f172a;
+}
+
+.kiosk-bright h1,
+.kiosk-bright h2 {
+  color: #0f172a;
+}
+
+.kiosk-bright p {
+  color: #475569;
+}
+
 /* Loading spinner */
 .loading {
   display: flex;

@@ -47,6 +47,16 @@ export function attachSignalingServer(server: HttpServer): void {
         return;
       }
 
+      // '*' broadcasts to every resident device - used by the kiosk to
+      // cancel/end a call before it knows which specific device answered.
+      if (msg.to === '*') {
+        const payload = JSON.stringify({ ...msg, from: deviceId });
+        for (const d of devices.values()) {
+          if (d.role === 'resident' && d.ws.readyState === WebSocket.OPEN) d.ws.send(payload);
+        }
+        return;
+      }
+
       const target = msg.to ? devices.get(msg.to) : null;
       if (target && target.ws.readyState === WebSocket.OPEN) {
         target.ws.send(JSON.stringify({ ...msg, from: deviceId }));

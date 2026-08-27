@@ -272,6 +272,18 @@
   border-radius: 8px;
 }
 
+/* The kiosk-sized global `input {}` rule (width:100%, padding:20px,
+   font-size:32px) also matched checkboxes, blowing them up into a huge
+   box that shoved the label text far to the right. */
+.admin-content input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin: 0;
+  flex: none;
+  accent-color: var(--primary);
+}
+
 .admin-content h2 {
   text-align: left;
 }

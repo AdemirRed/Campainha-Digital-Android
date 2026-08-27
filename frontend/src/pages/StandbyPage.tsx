@@ -448,10 +448,15 @@ export function StandbyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // Flip the screen bright white while the camera is actively trying to
+  // recognize someone in the dark - acts like a flashlight pointed at
+  // the visitor's face, giving the camera more light to expose with.
+  const isBright = phase === 'active' || phase === 'conversing';
+
   return (
     <div
-      className="fullscreen"
-      style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', cursor: 'pointer' }}
+      className={`fullscreen${isBright ? ' kiosk-bright' : ''}`}
+      style={isBright ? { cursor: 'pointer' } : { background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', cursor: 'pointer' }}
       onClick={() => !welcomeName && navigate('/home')}
     >
       <video

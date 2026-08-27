@@ -24,7 +24,7 @@ export function CallResidentPage() {
   const segmentRecorderRef = useRef<MediaRecorder | null>(null);
   const segmentAudioStreamRef = useRef<MediaStream | null>(null);
   const allChunksRef = useRef<Blob[]>([]);
-  const [subtitle, setSubtitle] = useState('Ligando para o morador...');
+  const [subtitle, setSubtitle] = useState('Chamando o assistente virtual...');
   const [done, setDone] = useState(false);
 
   // Starts a fresh recording segment (its own audio track + the shared
@@ -84,11 +84,10 @@ export function CallResidentPage() {
         setSubtitle(`Não foi possível acessar a câmera: ${err.message || err.name}`);
       }
 
-      await apiService.createEvent({ type: EventType.CALL_REQUESTED, metadata: {} }).catch(() => {});
+      await apiService.createEvent({ type: EventType.BUTTON_PRESSED, metadata: { reason: 'assistant' } }).catch(() => {});
 
       const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
-      const opening =
-        'Você chamou o morador, mas ele pode demorar para atender. Enquanto isso, posso anotar o motivo da sua visita?';
+      const opening = 'Olá! Sou o assistente virtual daqui. Em que posso ajudar?';
       transcript.push({ role: 'assistant', content: opening });
       setSubtitle(opening);
       if (!cancelled) await speak(opening);
@@ -197,7 +196,7 @@ export function CallResidentPage() {
   }, []);
 
   return (
-    <div className="fullscreen">
+    <div className="fullscreen kiosk-bright">
       <div className="container text-center">
         <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}>
           <video
@@ -231,8 +230,8 @@ export function CallResidentPage() {
           )}
         </div>
 
-        <div className="icon mb-24">{done ? '✅' : '🔔'}</div>
-        <h1 className="mb-24">{done ? 'Recado enviado!' : 'Chamando morador...'}</h1>
+        <div className="icon mb-24">{done ? '✅' : '🤖'}</div>
+        <h1 className="mb-24">{done ? 'Recado enviado!' : 'Assistente virtual'}</h1>
         <p style={{ fontSize: '18px' }}>{subtitle}</p>
 
         {!done && (

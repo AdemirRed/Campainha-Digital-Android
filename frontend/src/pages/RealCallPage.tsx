@@ -24,6 +24,13 @@ export function RealCallPage() {
   const [phase, setPhase] = useState<Phase>('preparing');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Mirrors of the effect's local state, kept accessible from hangUp()
+  // (a plain event handler outside the effect) so it can actually tell
+  // the other side the call ended instead of just navigating away.
+  const clientRef = useRef<CallSignalingClient | null>(null);
+  const callIdRef = useRef<string | null>(null);
+  const peerDeviceIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     let localStream: MediaStream | null = null;
@@ -71,6 +78,7 @@ export function RealCallPage() {
       }
 
       client = new CallSignalingClient('kiosk', 'Campainha');
+      clientRef.current = client;
       client.connect();
 
       client.on('accept-call', (msg) => {
@@ -78,7 +86,10 @@ export function RealCallPage() {
         alreadyAccepted = true;
         if (ringTimeout) clearTimeout(ringTimeout);
         setPhase('connecting');
-        if (msg.from) startPeerConnection(msg.from);
+        if (msg.from) {
+          peerDeviceIdRef.current = msg.from;
+          startPeerConnection(msg.from);
+        }
       });
 
       client.on('call-answer', async (msg) => {
@@ -111,6 +122,7 @@ export function RealCallPage() {
         const result = await apiService.ringResidentDevices(callerLabel);
         if (cancelled) return;
         callId = result.callId;
+        callIdRef.current = callId;
         setPhase('ringing');
         ringTimeout = setTimeout(() => {
           if (!cancelled) setPhase('no-answer');
@@ -155,6 +167,9 @@ export function RealCallPage() {
     return () => {
       cancelled = true;
       cleanup();
+      clientRef.current = null;
+      callIdRef.current = null;
+      peerDeviceIdRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -169,6 +184,16 @@ export function RealCallPage() {
   }, [phase, navigate]);
 
   function hangUp() {
+    // Tell the other side the call is over instead of just leaving them
+    // stuck showing "em ligação" forever - target the specific device
+    // that answered if known, otherwise broadcast (still just ringing).
+    if (clientRef.current && callIdRef.current) {
+      clientRef.current.send({
+        type: 'call-end',
+        to: peerDeviceIdRef.current || '*',
+        callId: callIdRef.current,
+      });
+    }
     navigate('/home');
   }
 
@@ -186,7 +211,7 @@ export function RealCallPage() {
   const offerAssistantFallback = phase === 'no-answer' || phase === 'rejected';
 
   return (
-    <div className="fullscreen">
+    <div className="fullscreen kiosk-bright">
       <audio ref={remoteAudioRef} autoPlay />
       <div className="container text-center">
         <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}>
