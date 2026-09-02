@@ -224,6 +224,28 @@ class ApiService {
     });
   }
 
+  // Kiosk lock
+  async getKioskLock(doorbellId: number): Promise<import('@shared/types/doorbell').KioskLockState> {
+    return this.request(`/kiosk/${doorbellId}/lock`);
+  }
+  async unlockKiosk(doorbellId: number, minutes: number): Promise<import('@shared/types/doorbell').KioskLockState> {
+    return this.request(`/kiosk/${doorbellId}/unlock`, {
+      method: 'POST', body: JSON.stringify({ minutes }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+  async lockKiosk(doorbellId: number): Promise<import('@shared/types/doorbell').KioskLockState> {
+    return this.request(`/kiosk/${doorbellId}/lock`, {
+      method: 'POST', headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+  async setKioskLockEnabled(doorbellId: number, enabled: boolean): Promise<import('@shared/types/doorbell').KioskLockState> {
+    return this.request(`/kiosk/${doorbellId}/lock-enabled`, {
+      method: 'PATCH', body: JSON.stringify({ enabled }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // Face recognition (processed server-side)
   async getFaceDescriptor(imageBase64: string): Promise<number[]> {
     const result = await this.request<{ descriptor: number[] }>('/face/descriptor', {
