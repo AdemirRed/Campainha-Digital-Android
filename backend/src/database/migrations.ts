@@ -117,6 +117,21 @@ export function runMigrations(db: SqlJsDatabase): void {
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `
+    },
+    {
+      name: '009_create_doorbells_table',
+      sql: `
+        CREATE TABLE IF NOT EXISTS doorbells (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          device_key TEXT NOT NULL UNIQUE,
+          lock_enabled INTEGER NOT NULL DEFAULT 1,
+          unlock_until DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO doorbells (id, name, device_key) VALUES (1, 'Campainha', 'kiosk-1');
+      `
     }
   ];
 
