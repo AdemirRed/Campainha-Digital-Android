@@ -6,6 +6,7 @@ import { subscribeToPush } from '../utils/pushNotifications';
 import { CallSignalingClient } from '../utils/callSignaling';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
 import { startRingtone, stopRingtone } from '../utils/ringtone';
+import { setCallActive } from '../utils/kioskBusy';
 import { ChatTranscript } from '../components/ChatTranscript';
 
 const POLL_INTERVAL_MS = 4000;
@@ -244,6 +245,7 @@ export function NotificationsPage() {
   }, [active]);
 
   function endCall() {
+    setCallActive(false);
     stopRingtone();
     pcRef.current?.close();
     pcRef.current = null;
@@ -259,6 +261,7 @@ export function NotificationsPage() {
     const client = signalingRef.current;
     if (!pending || !client) return;
 
+    setCallActive(true);
     stopRingtone();
     setCallPhase('connecting');
 

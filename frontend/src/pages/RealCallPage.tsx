@@ -4,6 +4,7 @@ import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { CallSignalingClient } from '../utils/callSignaling';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
+import { setCallActive } from '../utils/kioskBusy';
 import Button from '../components/Button';
 
 type Phase = 'preparing' | 'ringing' | 'connecting' | 'connected' | 'rejected' | 'no-answer' | 'ended' | 'error';
@@ -32,6 +33,7 @@ export function RealCallPage() {
   const peerDeviceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    setCallActive(true);
     let cancelled = false;
     let localStream: MediaStream | null = null;
     let pc: RTCPeerConnection | null = null;
@@ -165,6 +167,7 @@ export function RealCallPage() {
     start();
 
     return () => {
+      setCallActive(false);
       cancelled = true;
       cleanup();
       clientRef.current = null;
