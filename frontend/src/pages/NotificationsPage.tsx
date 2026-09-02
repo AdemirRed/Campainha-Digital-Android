@@ -8,6 +8,7 @@ import { ICE_SERVERS } from '../utils/webrtcConfig';
 import { startRingtone, stopRingtone } from '../utils/ringtone';
 import { setCallActive } from '../utils/kioskBusy';
 import { ChatTranscript } from '../components/ChatTranscript';
+import { useLiveViewer } from '../hooks/useLiveViewer';
 
 const POLL_INTERVAL_MS = 4000;
 const LIVE_POLL_INTERVAL_MS = 2000;
@@ -89,6 +90,8 @@ export function NotificationsPage() {
   const [banner, setBanner] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const [live, setLive] = useState<{ label: string; frameBase64: string } | null>(null);
+  const [watchDoorbellId] = useState<number>(1); // uma campainha por ora
+  const liveView = useLiveViewer(watchDoorbellId);
   const lastSeenIdRef = useRef<number | null>(null);
 
   // Doorbell names, loaded once, so banners can be prefixed with which
@@ -390,6 +393,19 @@ export function NotificationsPage() {
           <h1>Notificações ativas</h1>
           <p style={{ color: 'var(--success)' }}>Escutando... mantenha esta aba aberta</p>
         </div>
+
+        <div style={{ marginBottom: 16, textAlign: 'center' }}>
+          {liveView.state === 'idle' || liveView.state === 'error' || liveView.state === 'busy'
+            ? <button className="btn btn-outline" onClick={liveView.start}>📷 Ver câmera ao vivo</button>
+            : <button className="btn btn-outline" onClick={liveView.stop}>■ Parar câmera</button>}
+          {liveView.state === 'busy' && <p style={{ color: 'var(--text-gray)' }}>Campainha ocupada em uma chamada</p>}
+          {liveView.state === 'error' && <p style={{ color: 'var(--error)' }}>{liveView.errorMsg}</p>}
+        </div>
+        <video
+          ref={liveView.videoRef}
+          autoPlay playsInline muted
+          style={{ width: '100%', borderRadius: 12, background: '#000', marginBottom: 16, display: liveView.state === 'live' || liveView.state === 'connecting' ? 'block' : 'none' }}
+        />
 
         {live && (
           <div

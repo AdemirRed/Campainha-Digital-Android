@@ -26,8 +26,8 @@ export class CallSignalingClient {
   private closedByUser = false;
   readonly deviceId: string;
 
-  constructor(private role: 'kiosk' | 'resident', private label: string) {
-    this.deviceId = getOrCreateDeviceId(role);
+  constructor(private role: 'kiosk' | 'resident', private label: string, deviceIdOverride?: string) {
+    this.deviceId = deviceIdOverride ?? getOrCreateDeviceId(role);
   }
 
   connect(): void {

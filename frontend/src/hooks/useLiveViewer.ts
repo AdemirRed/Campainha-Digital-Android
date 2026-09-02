@@ -55,7 +55,7 @@ export function useLiveViewer(targetDoorbellId: number) {
     const watchId = crypto.randomUUID();
     watchIdRef.current = watchId;
     const to = `kiosk:${targetDoorbellId}`;
-    const client = new CallSignalingClient('resident', 'Observador');
+    const client = new CallSignalingClient('resident', 'Observador', `watch-${watchId}`);
     clientRef.current = client;
     dispatch({ type: 'start' });
     setErrorMsg(null);
