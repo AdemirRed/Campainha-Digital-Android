@@ -102,3 +102,12 @@ export function broadcastIncomingCall(callId: string, callerLabel: string): void
 export function getResidentsOnlineCount(): number {
   return countResidentsOnline();
 }
+
+export function sendToDevice(deviceId: string, payload: object): boolean {
+  const target = devices.get(deviceId);
+  if (target && target.ws.readyState === WebSocket.OPEN) {
+    target.ws.send(JSON.stringify(payload));
+    return true;
+  }
+  return false;
+}

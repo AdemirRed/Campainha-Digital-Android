@@ -11,6 +11,7 @@ import { createRecordingsRouter } from './recordings';
 import { createLiveRouter } from './live';
 import { createPushRouter } from './push';
 import { createDoorbellRouter } from './doorbells';
+import { createKioskRouter } from './kiosk';
 import { logger } from '../utils/logger';
 
 export function setupRoutes(app: Express): void {
@@ -29,6 +30,7 @@ export function setupRoutes(app: Express): void {
   apiRouter.use('/live', createLiveRouter());
   apiRouter.use('/push', createPushRouter());
   apiRouter.use('/doorbells', createDoorbellRouter());
+  apiRouter.use('/kiosk', createKioskRouter());
 
   // Face recognition depends on `canvas` (a native module) and
   // @vladmandic/face-api, which aren't installed on constrained hosts like
