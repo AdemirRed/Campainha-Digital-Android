@@ -78,6 +78,12 @@ export class VisitorRepository {
     Database.getInstance().save();
   }
 
+  rename(id: number, name: string): Visitor | null {
+    this.db.run('UPDATE visitors SET name = ? WHERE id = ?', [name, id]);
+    Database.getInstance().save();
+    return this.findById(id);
+  }
+
   delete(id: number): void {
     this.db.run('DELETE FROM visitors WHERE id = ?', [id]);
     Database.getInstance().save();

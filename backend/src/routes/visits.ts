@@ -2,12 +2,10 @@ import { Router } from 'express';
 import { VisitorController } from '../controllers/VisitorController';
 import { auth } from '../middleware/auth';
 
-export function createVisitorRouter(): Router {
+export function createVisitsRouter(): Router {
   const router = Router();
   const c = new VisitorController();
-  router.get('/', c.list);
-  router.post('/unrecognized', c.recordUnrecognized.bind(c));
-  router.patch('/:id', auth, c.rename);
-  router.get('/:id/visits', c.listVisits);
+  router.get('/', c.timeline);
+  router.post('/:id/name', auth, c.nameVisit);
   return router;
 }

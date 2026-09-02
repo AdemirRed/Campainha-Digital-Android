@@ -5,6 +5,7 @@ import { createSettingsRouter } from './settings';
 import { createResidentsRouter } from './residents';
 import { createMessageRouter } from './messages';
 import { createVisitorRouter } from './visitors';
+import { createVisitsRouter } from './visits';
 import { createAssistantRouter } from './assistant';
 import { createStorageRouter } from './storage';
 import { createRecordingsRouter } from './recordings';
@@ -24,6 +25,7 @@ export function setupRoutes(app: Express): void {
   apiRouter.use('/residents', createResidentsRouter());
   apiRouter.use('/messages', createMessageRouter());
   apiRouter.use('/visitors', createVisitorRouter());
+  apiRouter.use('/visits', createVisitsRouter());
   apiRouter.use('/assistant', createAssistantRouter());
   apiRouter.use('/storage', createStorageRouter());
   apiRouter.use('/recordings', createRecordingsRouter());

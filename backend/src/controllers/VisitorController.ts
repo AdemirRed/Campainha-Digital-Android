@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { EventRepository } from '../database/repositories/EventRepository';
 import { VisitsRepository } from '../database/repositories/VisitsRepository';
+import { VisitorRepository } from '../database/repositories/VisitorRepository';
 import { EventType } from '@shared/types/event';
 import { ApiResponse } from '@shared/types/api';
 
@@ -75,4 +76,60 @@ export class VisitorController {
       } as ApiResponse);
     }
   }
+
+  list = (_req: Request, res: Response): void => {
+    res.json({ success: true, data: new VisitorRepository().findAll() } as ApiResponse);
+  };
+
+  rename = (req: Request, res: Response): void => {
+    const id = Number(req.params.id);
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) { res.status(400).json({ success: false, error: 'name é obrigatório' } as ApiResponse); return; }
+    const updated = new VisitorRepository().rename(id, name);
+    if (!updated) { res.status(404).json({ success: false, error: 'Visitante não encontrado' } as ApiResponse); return; }
+    res.json({ success: true, data: updated } as ApiResponse);
+  };
+
+  listVisits = (req: Request, res: Response): void => {
+    const id = Number(req.params.id);
+    res.json({ success: true, data: new VisitsRepository().listByVisitor(id) } as ApiResponse);
+  };
+
+  timeline = (req: Request, res: Response): void => {
+    const page = Number(req.query.page) || 1;
+    const pageSize = Math.min(100, Number(req.query.pageSize) || 20);
+    const doorbellId = req.query.doorbellId ? Number(req.query.doorbellId) : undefined;
+    res.json({ success: true, data: new VisitsRepository().listTimeline(page, pageSize, doorbellId) } as ApiResponse);
+  };
+
+  nameVisit = (req: Request, res: Response): void => {
+    const visitId = Number(req.params.id);
+    const name = String(req.body?.name ?? '').trim();
+    if (!name) { res.status(400).json({ success: false, error: 'name é obrigatório' } as ApiResponse); return; }
+    const visitsRepo = new VisitsRepository();
+    const visitorRepo = new VisitorRepository();
+    const visit = visitsRepo.findById(visitId);
+    if (!visit) { res.status(404).json({ success: false, error: 'Visita não encontrada' } as ApiResponse); return; }
+
+    let visitorId = visit.visitor_id;
+    if (visitorId) {
+      visitorRepo.rename(visitorId, name);
+    } else {
+      const created = visitorRepo.create({
+        name,
+        descriptor: visit.descriptor ?? [],
+        photo_path: visit.photo_path ?? null,
+        notes: null,
+      });
+      visitorId = created.id;
+    }
+    visitsRepo.attachVisitor(visitId, visitorId, name);
+    // propaga o nome para outras visitas já vinculadas a esse visitante
+    for (const v of visitsRepo.listByVisitor(visitorId)) {
+      if (!v.name_snapshot || v.name_snapshot === 'Desconhecido') {
+        visitsRepo.attachVisitor(v.id, visitorId, name);
+      }
+    }
+    res.json({ success: true, data: { visitorId } } as ApiResponse);
+  };
 }
