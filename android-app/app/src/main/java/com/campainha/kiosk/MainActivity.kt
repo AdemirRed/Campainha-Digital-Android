@@ -111,6 +111,10 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { onLockStateChanged(isLocked) }
         }
         lockClient?.start()
+
+        // O KioskLockClient pode ainda não ter respondido; tudo bem,
+        // onLockStateChanged re-chama quando o estado chegar.
+        if (locked) tryStartLockTask() // Task 18
     }
 
     private fun onLockStateChanged(isLocked: Boolean) {
@@ -124,9 +128,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Task 18: preencher
-    private fun tryStartLockTask() {}
-    private fun tryStopLockTask() {}
+    // Task 18: camada opcional de Lock Task, ativa só quando o app é
+    // device owner (adb shell dpm set-device-owner ...). Sem isso, os
+    // métodos são no-ops silenciosos e só o watchdog (Task 17) atua.
+    private fun dpm() =
+        getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+
+    private fun tryStartLockTask() {
+        try {
+            val dpm = dpm()
+            if (dpm.isDeviceOwnerApp(packageName)) {
+                val admin = android.content.ComponentName(this, DeviceAdminReceiver::class.java)
+                dpm.setLockTaskPackages(admin, arrayOf(packageName))
+                startLockTask()
+            }
+        } catch (_: Exception) { /* sem device owner: só o watchdog atua */ }
+    }
+
+    private fun tryStopLockTask() {
+        try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            if (am.lockTaskModeState != android.app.ActivityManager.LOCK_TASK_MODE_NONE) {
+                stopLockTask()
+            }
+        } catch (_: Exception) {}
+    }
 
     private fun applyKioskWindowFlags() {
         // Keep the screen on and always fullscreen/immersive - status and

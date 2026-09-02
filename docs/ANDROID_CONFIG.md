@@ -262,6 +262,30 @@ Geralmente já vem com Android puro, poucas configurações extras necessárias.
 
 ---
 
+## Modo kiosk reforçado (opcional, sem root)
+
+Sem esta etapa o app já funciona: quando o "Modo kiosk" está ligado no
+painel, o `KioskWatchdogService` relança o app se alguém sair dele. Mas o
+botão Home não é bloqueável nesse modo. Para travar de verdade (Lock Task,
+com Home e Recentes bloqueados), provisione o app como **device owner**:
+
+```
+1. No aparelho da campainha: remova todas as contas Google (Config > Contas).
+2. Ative Depuração USB e conecte no PC.
+3. Instale o app (adb install app-debug.apk).
+4. Rode:
+   adb shell dpm set-device-owner com.campainha.kiosk/.DeviceAdminReceiver
+5. Pronto: com "Modo kiosk" ligado no painel, o app trava em Lock Task
+   (Home e Recentes bloqueados). Sem esse passo, o app ainda usa o
+   watchdog de relançamento, mas o botão Home não é bloqueável.
+Para reverter: adb shell dpm remove-active-admin com.campainha.kiosk/.DeviceAdminReceiver
+```
+
+O comando `set-device-owner` só funciona num aparelho recém-configurado
+(sem contas adicionadas). Não requer root.
+
+---
+
 **Próximo Passo**: [Troubleshooting Geral](TROUBLESHOOTING.md)
 
 **Versão**: 1.0 (Fase 1 - MVP)
