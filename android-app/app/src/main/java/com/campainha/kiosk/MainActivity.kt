@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_URL = "kiosk_url"
         private const val KEY_PIN = "kiosk_pin"
         private const val KEY_DOORBELL = "doorbell_id"
+        private const val KEY_LOCAL_UNLOCK = "local_unlock_until"
         private const val DEFAULT_DOORBELL = 1
         private const val CAMERA_MIC_REQUEST_CODE = 100
 
@@ -111,6 +112,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread { onLockStateChanged(isLocked) }
         }
         lockClient?.start()
+
+        val savedLocal = prefs.getLong(KEY_LOCAL_UNLOCK, 0L)
+        if (savedLocal > System.currentTimeMillis()) lockClient?.setLocalUnlockUntil(savedLocal)
 
         // O KioskLockClient pode ainda não ter respondido; tudo bem,
         // onLockStateChanged re-chama quando o estado chegar.
@@ -295,8 +299,17 @@ class MainActivity : AppCompatActivity() {
                     1 -> promptForUrl()
                     2 -> promptForNewPin()
                     3 -> promptForDoorbellId()
-                    4 -> { /* Task 19: desbloqueio local */ }
-                    5 -> { /* Task 19: gate por locked */ finishAffinity() }
+                    4 -> {
+                        val until = System.currentTimeMillis() + 15 * 60_000L
+                        prefs.edit().putLong(KEY_LOCAL_UNLOCK, until).apply()
+                        lockClient?.setLocalUnlockUntil(until)
+                    }
+                    5 -> {
+                        if (!locked) finishAffinity()
+                        else AlertDialog.Builder(this)
+                            .setMessage("O modo kiosk está travado. Desbloqueie pelo painel ou use \"Desbloquear 15 min\".")
+                            .setPositiveButton("OK", null).show()
+                    }
                 }
             }
             .setNegativeButton("Fechar", null)
