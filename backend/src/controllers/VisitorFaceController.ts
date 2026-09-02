@@ -4,6 +4,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { VisitorRepository } from '../database/repositories/VisitorRepository';
 import { computeFaceDescriptor, matchVisitorDescriptor } from '../services/FaceRecognitionService';
+import { VisitsRepository } from '../database/repositories/VisitsRepository';
 import { ApiResponse } from '@shared/types/api';
 
 function base64ToBuffer(base64: string): Buffer {
@@ -91,6 +92,15 @@ export class VisitorFaceController {
       }
 
       this.visitorRepo.markSeen(match.visitor.id);
+
+      const { doorbellId } = req.body;
+      new VisitsRepository().create({
+        visitor_id: match.visitor.id,
+        descriptor,
+        doorbell_id: Number(doorbellId) || null,
+        name_snapshot: match.visitor.name,
+      });
+
       res.json({ success: true, data: this.visitorRepo.findById(match.visitor.id) } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message } as ApiResponse);

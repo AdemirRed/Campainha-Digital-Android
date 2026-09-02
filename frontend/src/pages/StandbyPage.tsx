@@ -386,7 +386,13 @@ export function StandbyPage() {
     await stopRecordingSegment();
     const videoBase64 = await getRecordedBase64();
     if (videoBase64) {
-      apiService.recordUnrecognizedVisit(videoBase64).catch(() => {
+      let stillBase64: string | undefined;
+      try {
+        if (videoRef.current) stillBase64 = captureVideoFrameAsBase64(videoRef.current);
+      } catch {
+        // sem frame - segue sem foto
+      }
+      apiService.recordUnrecognizedVisit(videoBase64, stillBase64).catch(() => {
         // best-effort - a failed upload shouldn't block the kiosk flow
       });
     }
