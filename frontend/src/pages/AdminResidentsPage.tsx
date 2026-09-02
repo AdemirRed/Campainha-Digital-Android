@@ -8,16 +8,18 @@ import AdminVisitorsTab from './admin/AdminVisitorsTab';
 import AdminDeliveriesTab from './admin/AdminDeliveriesTab';
 import AdminRecordingsTab from './admin/AdminRecordingsTab';
 import AdminSettingsTab from './admin/AdminSettingsTab';
+import AdminDoorbellsTab from './admin/AdminDoorbellsTab';
 import '../styles/admin.css';
 
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN || '1234';
 
-type Tab = 'residents' | 'messages' | 'visitors' | 'deliveries' | 'recordings' | 'settings';
+type Tab = 'residents' | 'messages' | 'visitors' | 'deliveries' | 'doorbells' | 'recordings' | 'settings';
 
 const TABS: { key: Tab; icon: string; label: string }[] = [
   { key: 'residents', icon: '👤', label: 'Moradores' },
   { key: 'messages', icon: '💬', label: 'Mensagens' },
   { key: 'visitors', icon: '🕵️', label: 'Visitantes' },
+  { key: 'doorbells', icon: '📟', label: 'Campainhas' },
   { key: 'deliveries', icon: '📦', label: 'Entregas' },
   { key: 'recordings', icon: '📹', label: 'Gravações' },
   { key: 'settings', icon: '⚙️', label: 'Config.' },
@@ -114,6 +116,7 @@ export function AdminResidentsPage() {
             {tab === 'residents' && <AdminResidentsTab showToast={showToast} />}
             {tab === 'messages' && <AdminMessagesTab showToast={showToast} />}
             {tab === 'visitors' && <AdminVisitorsTab showToast={showToast} />}
+            {tab === 'doorbells' && <AdminDoorbellsTab showToast={showToast} />}
             {tab === 'deliveries' && <AdminDeliveriesTab showToast={showToast} />}
             {tab === 'recordings' && <AdminRecordingsTab showToast={showToast} />}
             {tab === 'settings' && <AdminSettingsTab showToast={showToast} />}
