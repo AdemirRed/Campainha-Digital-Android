@@ -2,6 +2,8 @@ package com.campainha.kiosk
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -72,6 +74,20 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_DOORBELL = "doorbell_id"
         private const val DEFAULT_DOORBELL = 1
         private const val CAMERA_MIC_REQUEST_CODE = 100
+
+        @Volatile @JvmStatic var foreground: Boolean = false
+        @JvmStatic fun relaunchSelf(context: Context) {
+            val i = Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            context.startActivity(i)
+        }
+    }
+
+    override fun onStart() { super.onStart(); foreground = true }
+    override fun onStop() { super.onStop(); foreground = false }
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (locked) relaunchSelf(applicationContext)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,8 +115,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun onLockStateChanged(isLocked: Boolean) {
         locked = isLocked
-        // Task 17: aplicar/retirar watchdog + lock task
+        if (isLocked) {
+            KioskWatchdogService.start(applicationContext)
+            tryStartLockTask() // Task 18
+        } else {
+            KioskWatchdogService.stop(applicationContext)
+            tryStopLockTask()  // Task 18
+        }
     }
+
+    // Task 18: preencher
+    private fun tryStartLockTask() {}
+    private fun tryStopLockTask() {}
 
     private fun applyKioskWindowFlags() {
         // Keep the screen on and always fullscreen/immersive - status and
@@ -181,7 +207,8 @@ class MainActivity : AppCompatActivity() {
     // Consume the back button entirely - there is no "back" out of the
     // kiosk except through the PIN-protected exit menu.
     override fun onBackPressed() {
-        // no-op on purpose
+        if (!locked) super.onBackPressed()
+        // travado: consome
     }
 
     override fun onDestroy() {
