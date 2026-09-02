@@ -109,9 +109,80 @@ function PeopleView({ showToast }: { showToast: (m: string, t?: 'success' | 'err
   );
 }
 
-// Preenchido na Task 25
-function TimelineView(_props: { showToast: (m: string, t?: 'success' | 'error') => void }) {
-  return <p>Carregando linha do tempo...</p>;
+function TimelineView({ showToast }: { showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const [items, setItems] = useState<Visit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState<Record<number, string>>({});
+  const PAGE_SIZE = 20;
+
+  async function loadPage(p: number) {
+    setLoading(true);
+    try {
+      const res = await apiService.getVisits(p, PAGE_SIZE);
+      setItems((prev) => (p === 1 ? res.items : [...prev, ...res.items]));
+      setTotal(res.total);
+      setPage(p);
+    } catch (e: any) {
+      showToast(e.message || 'Erro ao carregar', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { loadPage(1); }, []);
+
+  async function name(visitId: number) {
+    const n = (draft[visitId] ?? '').trim();
+    if (!n) return;
+    try {
+      await apiService.nameVisit(visitId, n);
+      showToast('Visitante batizado');
+      loadPage(1);
+    } catch (e: any) {
+      showToast(e.message || 'Erro', 'error');
+    }
+  }
+
+  const isUnknown = (v: Visit) => !v.visitor_id && (!v.name_snapshot || v.name_snapshot.toLowerCase().startsWith('desconhecido'));
+
+  if (loading && items.length === 0) return <p>Carregando...</p>;
+  if (items.length === 0) return <div className="admin-empty">Nenhuma visita registrada.</div>;
+
+  return (
+    <div>
+      {items.map((v) => (
+        <div key={v.id} className="admin-card" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
+          {v.photo_path
+            ? <img src={`${STORAGE_BASE_URL}/storage/photos/${v.photo_path}`} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover' }} />
+            : <div style={{ width: 56, height: 56, borderRadius: 8, background: 'var(--bg-darker)' }} />}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, color: '#64748b' }}>
+              {new Date(v.created_at).toLocaleString('pt-BR')}{v.doorbell_id ? ` · campainha ${v.doorbell_id}` : ''}
+            </div>
+            {isUnknown(v) ? (
+              <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                <input
+                  placeholder="Desconhecido — dar um nome"
+                  value={draft[v.id] ?? ''}
+                  onChange={(e) => setDraft((p) => ({ ...p, [v.id]: e.target.value }))}
+                  style={{ flex: '1 1 140px', padding: 6 }}
+                />
+                <button className="admin-btn" onClick={() => name(v.id)}>Batizar</button>
+              </div>
+            ) : (
+              <div style={{ fontWeight: 600 }}>{v.name_snapshot || 'Visitante'}</div>
+            )}
+          </div>
+        </div>
+      ))}
+      {items.length < total && (
+        <button className="admin-btn" onClick={() => loadPage(page + 1)} disabled={loading}>
+          {loading ? 'Carregando...' : 'Carregar mais'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default AdminVisitorsTab;
