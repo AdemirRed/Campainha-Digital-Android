@@ -80,8 +80,10 @@ class KioskLockClient(
     private fun parseIso(iso: String?): Long {
         if (iso.isNullOrBlank()) return 0L
         return try {
-            java.time.Instant.parse(iso).toEpochMilli()
-        } catch (_: Exception) { 0L }
+            val fmt = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+            fmt.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            fmt.parse(iso)?.time ?: 0L
+        } catch (_: Throwable) { 0L }
     }
 
     private fun connectWs() {
@@ -101,7 +103,9 @@ class KioskLockClient(
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 // reconecta em 5s
-                poller?.schedule({ connectWs() }, 5, TimeUnit.SECONDS)
+                try {
+                    poller?.schedule({ connectWs() }, 5, TimeUnit.SECONDS)
+                } catch (_: Exception) {}
             }
         })
     }
