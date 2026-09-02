@@ -18,10 +18,17 @@ describe('rotas de visitantes/visitas', () => {
   beforeEach(async () => { await initTestDb(); server?.close(); await start(); });
   afterAll(() => { server?.close(); closeTestDb(); });
 
-  it('GET /api/visitors lista', async () => {
+  it('GET /api/visitors lista (com auth, sem descriptor)', async () => {
     new VisitorRepository().create({ name: 'Ana', descriptor: [0.1], photo_path: null, notes: null });
-    const b = await (await fetch(`${base}/api/visitors`)).json();
+    const res = await fetch(`${base}/api/visitors`, { headers: H });
+    const b = await res.json();
     expect(b.data[0].name).toBe('Ana');
+    expect(b.data[0]).not.toHaveProperty('descriptor');
+  });
+
+  it('GET /api/visitors sem token retorna 401', async () => {
+    const res = await fetch(`${base}/api/visitors`);
+    expect(res.status).toBe(401);
   });
 
   it('PATCH renomeia (com auth)', async () => {
@@ -36,7 +43,7 @@ describe('rotas de visitantes/visitas', () => {
     vr.create({ visitor_id: null, doorbell_id: 1, name_snapshot: 'Desconhecido' });
     const tl = await (await fetch(`${base}/api/visits?page=1&pageSize=10`)).json();
     expect(tl.data.total).toBe(2);
-    const byV = await (await fetch(`${base}/api/visitors/5/visits`)).json();
+    const byV = await (await fetch(`${base}/api/visitors/5/visits`, { headers: H })).json();
     expect(byV.data).toHaveLength(1);
   });
 
@@ -47,5 +54,15 @@ describe('rotas de visitantes/visitas', () => {
     expect(b.data.visitorId).toBeGreaterThan(0);
     expect(vr.findById(visit.id)?.visitor_id).toBe(b.data.visitorId);
     expect(new VisitorRepository().findById(b.data.visitorId)?.name).toBe('Carla');
+  });
+
+  it('POST /api/visits/:id/name sem descriptor não cria visitante, só rotula', async () => {
+    const vr = new VisitsRepository();
+    const visit = vr.create({ visitor_id: null, doorbell_id: 1, name_snapshot: 'Desconhecido' });
+    const b = await (await fetch(`${base}/api/visits/${visit.id}/name`, { method: 'POST', headers: H, body: JSON.stringify({ name: 'Dani' }) })).json();
+    expect(b.data.visitorId).toBeNull();
+    expect(new VisitorRepository().findAll()).toHaveLength(0);
+    expect(vr.findById(visit.id)?.name_snapshot).toBe('Dani');
+    expect(vr.findById(visit.id)?.visitor_id).toBeNull();
   });
 });

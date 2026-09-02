@@ -6,8 +6,8 @@ type Handler = (msg: SignalingMessage) => void;
 
 const DEVICE_ID_KEY = 'campainha_device_id';
 
-export function getOrCreateDeviceId(role: 'kiosk' | 'resident'): string {
-  if (role === 'kiosk') return `kiosk:${getDoorbellId()}`;
+export function getOrCreateDeviceId(role: 'kiosk' | 'resident', purpose?: string): string {
+  if (role === 'kiosk') return purpose ? `kiosk:${getDoorbellId()}:${purpose}` : `kiosk:${getDoorbellId()}`;
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
     id = crypto.randomUUID();
@@ -24,6 +24,7 @@ export class CallSignalingClient {
   private handlers = new Map<string, Set<Handler>>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closedByUser = false;
+  private openHandlers = new Set<() => void>();
   readonly deviceId: string;
 
   constructor(private role: 'kiosk' | 'resident', private label: string, deviceIdOverride?: string) {
@@ -36,6 +37,11 @@ export class CallSignalingClient {
     const url = `${origin}/ws/calls?deviceId=${encodeURIComponent(this.deviceId)}&role=${this.role}&label=${encodeURIComponent(this.label)}`;
 
     this.ws = new WebSocket(url);
+    this.ws.onopen = () => {
+      this.openHandlers.forEach((cb) => {
+        try { cb(); } catch { /* ignore handler error */ }
+      });
+    };
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
@@ -59,6 +65,15 @@ export class CallSignalingClient {
     return () => this.handlers.get(type)?.delete(handler);
   }
 
+  // Runs cb once the socket is OPEN (immediately if already open), and
+  // again on every subsequent reconnect - so callers can re-issue a
+  // request that would otherwise be silently dropped on a cold socket.
+  onceOpen(cb: () => void): () => void {
+    this.openHandlers.add(cb);
+    if (this.ws?.readyState === WebSocket.OPEN) cb();
+    return () => this.openHandlers.delete(cb);
+  }
+
   send(msg: SignalingMessage): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
@@ -68,6 +83,7 @@ export class CallSignalingClient {
   close(): void {
     this.closedByUser = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.openHandlers.clear();
     this.ws?.close();
     this.ws = null;
   }

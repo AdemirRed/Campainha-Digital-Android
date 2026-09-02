@@ -25,7 +25,7 @@ export function useKioskLiveHost(): void {
       })
       .catch(() => {});
 
-    const client = new CallSignalingClient('kiosk', doorbellName);
+    const client = new CallSignalingClient('kiosk', doorbellName, `kiosk:${getDoorbellId()}:live`);
     let session: WatchSession | null = null;
 
     function teardown() {

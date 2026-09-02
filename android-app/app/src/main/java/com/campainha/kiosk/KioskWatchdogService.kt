@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 
 class KioskWatchdogService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -18,7 +19,8 @@ class KioskWatchdogService : Service() {
     private val tick = object : Runnable {
         override fun run() {
             if (!running) return
-            if (!MainActivity.foreground) {
+            val interactive = (getSystemService(POWER_SERVICE) as PowerManager).isInteractive
+            if (interactive && !MainActivity.foreground) {
                 MainActivity.relaunchSelf(applicationContext)
             }
             handler.postDelayed(this, 700)

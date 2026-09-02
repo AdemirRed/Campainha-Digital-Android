@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { DoorbellRepository } from '../database/repositories/DoorbellRepository';
 import { computeLockState } from '../domain/kioskLock';
-import { sendToDevice } from '../services/CallSignalingService';
+import { sendToKiosk } from '../services/CallSignalingService';
 import { ApiResponse } from '@shared/types/api';
 
 export class KioskController {
@@ -19,7 +19,7 @@ export class KioskController {
       res.status(404).json({ success: false, error: 'Campainha não encontrada' } as ApiResponse);
       return;
     }
-    sendToDevice(`kiosk:${id}`, { type: 'kiosk-lock', ...state });
+    sendToKiosk(id, { type: 'kiosk-lock', ...state });
     res.json({ success: true, data: state } as ApiResponse);
   }
 

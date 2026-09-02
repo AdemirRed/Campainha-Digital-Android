@@ -1,5 +1,6 @@
 package com.campainha.kiosk
 
+import android.content.SharedPreferences
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -13,18 +14,33 @@ import java.util.concurrent.TimeUnit
 class KioskLockClient(
     private val baseUrl: String,
     private val doorbellId: Int,
+    private val prefs: SharedPreferences? = null,
     private val onLockChange: (locked: Boolean) -> Unit,
 ) {
     private val http = OkHttpClient()
     private var ws: WebSocket? = null
     private var poller: ScheduledExecutorService? = null
 
-    @Volatile private var serverLocked = true
+    // Fail-open: stay unlocked until we've heard from the server at least
+    // once (bad URL / backend down / no network must NOT hard-lock a
+    // freshly launched device). Once the server has confirmed a state we
+    // keep enforcing that last known state even while offline.
+    @Volatile private var serverLocked = false
     @Volatile private var serverUnlockUntilMs = 0L
     @Volatile private var localUnlockUntilMs = 0L
     @Volatile private var lastReported: Boolean? = null
+    @Volatile private var everContactedServer = false
 
     fun start() {
+        // Reboot: re-enforce the real last known server state immediately,
+        // without a fail-open window.
+        prefs?.let { p ->
+            if (p.contains(KEY_SRV_LOCKED)) {
+                serverLocked = p.getBoolean(KEY_SRV_LOCKED, false)
+                serverUnlockUntilMs = p.getLong(KEY_SRV_UNLOCK_UNTIL, 0L)
+                everContactedServer = true
+            }
+        }
         poller = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "kiosk-lock-poll") }
         poller?.scheduleWithFixedDelay({ pollOnce() }, 0, 10, TimeUnit.SECONDS)
         connectWs()
@@ -64,8 +80,9 @@ class KioskLockClient(
                 applyState(data)
             }
         } catch (_: Exception) {
-            // offline: mantém último estado; o gate local ainda vale
-            emitIfChanged()
+            // offline: só continua enforçando se o servidor já confirmou um
+            // estado alguma vez; antes disso, mantém fail-open.
+            if (everContactedServer) emitIfChanged()
         }
     }
 
@@ -74,6 +91,11 @@ class KioskLockClient(
         serverLocked = data.optBoolean("locked", true)
         val until = if (data.isNull("unlockUntil")) null else data.optString("unlockUntil", null)
         serverUnlockUntilMs = parseIso(until)
+        everContactedServer = true
+        prefs?.edit()
+            ?.putBoolean(KEY_SRV_LOCKED, serverLocked)
+            ?.putLong(KEY_SRV_UNLOCK_UNTIL, serverUnlockUntilMs)
+            ?.apply()
         emitIfChanged()
     }
 
@@ -86,8 +108,13 @@ class KioskLockClient(
         } catch (_: Throwable) { 0L }
     }
 
+    companion object {
+        private const val KEY_SRV_LOCKED = "srv_locked"
+        private const val KEY_SRV_UNLOCK_UNTIL = "srv_unlock_until"
+    }
+
     private fun connectWs() {
-        val wsUrl = baseUrl.replaceFirst("http", "ws") + "/ws/calls?deviceId=kiosk:$doorbellId&role=kiosk&label=Campainha"
+        val wsUrl = baseUrl.replaceFirst("http", "ws") + "/ws/calls?deviceId=kiosk:$doorbellId:lock&role=kiosk&label=Campainha"
         val req = Request.Builder().url(wsUrl).build()
         ws = http.newWebSocket(req, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -97,6 +124,11 @@ class KioskLockClient(
                         serverLocked = msg.optBoolean("locked", true)
                         val until = if (msg.isNull("unlockUntil")) null else msg.optString("unlockUntil", null)
                         serverUnlockUntilMs = parseIso(until)
+                        everContactedServer = true
+                        prefs?.edit()
+                            ?.putBoolean(KEY_SRV_LOCKED, serverLocked)
+                            ?.putLong(KEY_SRV_UNLOCK_UNTIL, serverUnlockUntilMs)
+                            ?.apply()
                         emitIfChanged()
                     }
                 } catch (_: Exception) {}

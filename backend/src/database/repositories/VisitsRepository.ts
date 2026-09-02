@@ -53,6 +53,13 @@ export class VisitsRepository {
     Database.getInstance().save();
   }
 
+  // Sets only the display name of a visit, without linking a visitor -
+  // used when baptizing a visit that carries no usable face descriptor.
+  setName(visitId: number, name: string): void {
+    this.db.run('UPDATE visits SET name_snapshot = ? WHERE id = ?', [name, visitId]);
+    Database.getInstance().save();
+  }
+
   private map(result: any, index: number): Visit {
     const columns: string[] = result.columns;
     const values = result.values[index];

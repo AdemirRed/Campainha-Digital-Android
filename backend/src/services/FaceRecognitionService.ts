@@ -119,7 +119,9 @@ export async function matchVisitorDescriptor<T extends StoredVisitor>(
   let best: VisitorMatch<T> | null = null;
 
   for (const visitor of visitors) {
+    if (!visitor.descriptor || visitor.descriptor.length !== 128) continue;
     const distance = faceapi.euclideanDistance(descriptor, visitor.descriptor);
+    if (!Number.isFinite(distance)) continue;
     if (!best || distance < best.distance) {
       best = { visitor, distance };
     }

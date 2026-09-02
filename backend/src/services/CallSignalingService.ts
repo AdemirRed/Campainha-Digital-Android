@@ -64,9 +64,11 @@ export function attachSignalingServer(server: HttpServer): void {
     });
 
     ws.on('close', () => {
-      devices.delete(deviceId);
-      logger.info(`Call signaling: ${role} "${label}" disconnected (${deviceId})`);
-      broadcastPresence();
+      if (devices.get(deviceId)?.ws === ws) {
+        devices.delete(deviceId);
+        logger.info(`Call signaling: ${role} "${label}" disconnected (${deviceId})`);
+        broadcastPresence();
+      }
     });
   });
 }
@@ -110,4 +112,23 @@ export function sendToDevice(deviceId: string, payload: object): boolean {
     return true;
   }
   return false;
+}
+
+// Fans out a payload to every connected device belonging to a given
+// doorbell's kiosk - the bare "kiosk:<id>" call endpoint plus any
+// purpose-suffixed socket ("kiosk:<id>:lock", "kiosk:<id>:live", ...).
+// Returns how many sockets it reached.
+export function sendToKiosk(doorbellId: number, payload: object): number {
+  const exact = `kiosk:${doorbellId}`;
+  const prefix = `kiosk:${doorbellId}:`;
+  const data = JSON.stringify(payload);
+  let sent = 0;
+  for (const d of devices.values()) {
+    if (d.deviceId !== exact && !d.deviceId.startsWith(prefix)) continue;
+    if (d.ws.readyState === WebSocket.OPEN) {
+      d.ws.send(data);
+      sent++;
+    }
+  }
+  return sent;
 }

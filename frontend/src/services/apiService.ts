@@ -309,7 +309,9 @@ class ApiService {
 
   // Visitors / Visits
   async getVisitors(): Promise<any[]> {
-    return this.request('/visitors');
+    return this.request('/visitors', {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
   }
   async renameVisitor(id: number, name: string): Promise<any> {
     return this.request(`/visitors/${id}`, {
@@ -318,7 +320,9 @@ class ApiService {
     });
   }
   async getVisitorVisits(id: number): Promise<import('@shared/types/visit').Visit[]> {
-    return this.request(`/visitors/${id}/visits`);
+    return this.request(`/visitors/${id}/visits`, {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
   }
   async getVisits(page: number, pageSize = 20, doorbellId?: number): Promise<{ items: import('@shared/types/visit').Visit[]; total: number }> {
     const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });

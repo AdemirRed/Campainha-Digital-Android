@@ -108,7 +108,7 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(urlWithDoorbell())
 
         val host = currentUrl().removeSuffix("/")
-        lockClient = KioskLockClient(host, currentDoorbellId()) { isLocked ->
+        lockClient = KioskLockClient(host, currentDoorbellId(), prefs) { isLocked ->
             runOnUiThread { onLockStateChanged(isLocked) }
         }
         lockClient?.start()
@@ -362,7 +362,14 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Salvar") { _, _ ->
                 val n = input.text.toString().trim().toIntOrNull()
                 if (n != null && n > 0) {
-                    prefs.edit().putInt(KEY_DOORBELL, n).apply()
+                    // limpa o estado de trava persistido da campainha anterior
+                    // (chaves de KioskLockClient) para o próximo launch não
+                    // restaurar o estado de outra campainha
+                    prefs.edit()
+                        .putInt(KEY_DOORBELL, n)
+                        .remove("srv_locked")
+                        .remove("srv_unlock_until")
+                        .apply()
                     webView.loadUrl(urlWithDoorbell())
                 }
             }

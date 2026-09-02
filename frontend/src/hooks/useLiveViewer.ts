@@ -37,7 +37,7 @@ export function useLiveViewer(targetDoorbellId: number) {
   const stop = useCallback(() => {
     const client = clientRef.current;
     if (client && watchIdRef.current) {
-      client.send({ type: 'watch-end', to: `kiosk:${targetDoorbellId}`, watchId: watchIdRef.current });
+      client.send({ type: 'watch-end', to: `kiosk:${targetDoorbellId}:live`, watchId: watchIdRef.current });
     }
     if (timersRef.current.req) clearTimeout(timersRef.current.req);
     if (timersRef.current.ping) clearInterval(timersRef.current.ping);
@@ -50,11 +50,20 @@ export function useLiveViewer(targetDoorbellId: number) {
     setErrorMsg(null);
   }, [dispatch, targetDoorbellId]);
 
+  // Terminal failure: tear everything down (so a later start() is not a
+  // no-op on the `if (clientRef.current) return` guard) then surface the
+  // error state.
+  const fail = useCallback((msg: string) => {
+    stop();
+    setErrorMsg(msg);
+    dispatch({ type: 'error' });
+  }, [stop, dispatch]);
+
   const start = useCallback(() => {
     if (clientRef.current) return;
     const watchId = crypto.randomUUID();
     watchIdRef.current = watchId;
-    const to = `kiosk:${targetDoorbellId}`;
+    const to = `kiosk:${targetDoorbellId}:live`;
     const client = new CallSignalingClient('resident', 'Observador', `watch-${watchId}`);
     clientRef.current = client;
     dispatch({ type: 'start' });
@@ -62,12 +71,13 @@ export function useLiveViewer(targetDoorbellId: number) {
 
     client.on('watch-busy', (msg) => {
       if (msg.watchId !== watchId) return;
+      if (timersRef.current.req) { clearTimeout(timersRef.current.req); timersRef.current.req = undefined; }
+      if (timersRef.current.ping) { clearInterval(timersRef.current.ping); timersRef.current.ping = undefined; }
       dispatch({ type: 'busy' });
     });
     client.on('watch-error', (msg) => {
       if (msg.watchId !== watchId) return;
-      setErrorMsg(msg.reason === 'camera' ? 'A campainha não conseguiu abrir a câmera' : String(msg.reason || 'Erro'));
-      dispatch({ type: 'error' });
+      fail(msg.reason === 'camera' ? 'A campainha não conseguiu abrir a câmera' : String(msg.reason || 'Erro'));
     });
     client.on('watch-offer', async (msg) => {
       if (msg.watchId !== watchId) return;
@@ -85,7 +95,7 @@ export function useLiveViewer(targetDoorbellId: number) {
       };
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'connected') dispatch({ type: 'connected' });
-        if (['failed', 'disconnected'].includes(pc.connectionState)) { setErrorMsg('Conexão perdida'); dispatch({ type: 'error' }); }
+        if (['failed', 'disconnected'].includes(pc.connectionState)) fail('Conexão perdida');
       };
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
@@ -95,8 +105,7 @@ export function useLiveViewer(targetDoorbellId: number) {
         dispatch({ type: 'offer' });
         timersRef.current.ping = setInterval(() => client.send({ type: 'watch-ping', to, watchId }), PING_INTERVAL_MS);
       } catch {
-        setErrorMsg('Falha ao negociar vídeo');
-        dispatch({ type: 'error' });
+        fail('Falha ao negociar vídeo');
       }
     });
     client.on('watch-ice', (msg) => {
@@ -104,17 +113,16 @@ export function useLiveViewer(targetDoorbellId: number) {
       pcRef.current.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {});
     });
     client.on('watch-end', (msg) => {
-      if (msg.watchId === watchId) { setErrorMsg('A campainha encerrou a transmissão'); dispatch({ type: 'error' }); }
+      if (msg.watchId === watchId) fail('A campainha encerrou a transmissão');
     });
 
     client.connect();
-    // dá um tempo pro socket abrir antes de pedir
-    setTimeout(() => client.send({ type: 'watch-request', to, watchId }), 300);
+    // (re)envia o pedido assim que o socket abre - inclusive após reconexão
+    client.onceOpen(() => client.send({ type: 'watch-request', to, watchId }));
     timersRef.current.req = setTimeout(() => {
-      setErrorMsg('A campainha não respondeu');
-      dispatch({ type: 'timeout' });
+      fail('A campainha não respondeu');
     }, REQUEST_TIMEOUT_MS);
-  }, [dispatch, targetDoorbellId]);
+  }, [dispatch, targetDoorbellId, fail]);
 
   useEffect(() => () => stop(), [stop]);
 

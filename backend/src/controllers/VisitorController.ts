@@ -78,7 +78,8 @@ export class VisitorController {
   }
 
   list = (_req: Request, res: Response): void => {
-    res.json({ success: true, data: new VisitorRepository().findAll() } as ApiResponse);
+    const rows = new VisitorRepository().findAll();
+    res.json({ success: true, data: rows.map(({ descriptor, ...rest }) => rest) } as ApiResponse);
   };
 
   rename = (req: Request, res: Response): void => {
@@ -96,8 +97,8 @@ export class VisitorController {
   };
 
   timeline = (req: Request, res: Response): void => {
-    const page = Number(req.query.page) || 1;
-    const pageSize = Math.min(100, Number(req.query.pageSize) || 20);
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
     const doorbellId = req.query.doorbellId ? Number(req.query.doorbellId) : undefined;
     res.json({ success: true, data: new VisitsRepository().listTimeline(page, pageSize, doorbellId) } as ApiResponse);
   };
@@ -112,6 +113,13 @@ export class VisitorController {
     if (!visit) { res.status(404).json({ success: false, error: 'Visita não encontrada' } as ApiResponse); return; }
 
     let visitorId = visit.visitor_id;
+    if (!visitorId && (!visit.descriptor || visit.descriptor.length === 0)) {
+      // Sem descriptor utilizável: não cria visitante (um descriptor vazio
+      // envenena o reconhecimento facial). Só rotula a visita.
+      visitsRepo.setName(visitId, name);
+      res.json({ success: true, data: { visitorId: null } } as ApiResponse);
+      return;
+    }
     if (visitorId) {
       visitorRepo.rename(visitorId, name);
     } else {

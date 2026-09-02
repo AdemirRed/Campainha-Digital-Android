@@ -266,7 +266,19 @@ Geralmente já vem com Android puro, poucas configurações extras necessárias.
 
 Sem esta etapa o app já funciona: quando o "Modo kiosk" está ligado no
 painel, o `KioskWatchdogService` relança o app se alguém sair dele. Mas o
-botão Home não é bloqueável nesse modo. Para travar de verdade (Lock Task,
+botão Home não é bloqueável nesse modo.
+
+> **Atenção:** o loop de relançamento do `KioskWatchdogService` é
+> *best-effort*. Em aparelhos que **não** estão provisionados como device
+> owner, o Android 10+ bloqueia o "background activity start", então o
+> relançamento automático pode simplesmente não acontecer. Por isso o
+> provisionamento como **device owner** (o passo `adb dpm set-device-owner`
+> abaixo) é **fortemente recomendado** para um enforcement de kiosk
+> confiável — o watchdog sozinho não garante nada. Limitação conhecida: o
+> loop do watchdog também roda com a tela desligada (ele só pula o
+> relançamento quando o aparelho não está interativo).
+
+Para travar de verdade (Lock Task,
 com Home e Recentes bloqueados), provisione o app como **device owner**:
 
 ```
