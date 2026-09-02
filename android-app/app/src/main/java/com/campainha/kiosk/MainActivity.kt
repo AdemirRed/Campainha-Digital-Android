@@ -26,6 +26,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var prefs: android.content.SharedPreferences
     private var tts: TextToSpeech? = null
+    private var lockClient: KioskLockClient? = null
+    @Volatile private var locked: Boolean = true
 
     // Android WebView doesn't reliably implement the Web Speech API
     // (window.speechSynthesis silently no-ops on many WebView versions,
@@ -87,6 +89,17 @@ class MainActivity : AppCompatActivity() {
 
         requestRuntimePermissions()
         webView.loadUrl(urlWithDoorbell())
+
+        val host = currentUrl().removeSuffix("/")
+        lockClient = KioskLockClient(host, currentDoorbellId()) { isLocked ->
+            runOnUiThread { onLockStateChanged(isLocked) }
+        }
+        lockClient?.start()
+    }
+
+    private fun onLockStateChanged(isLocked: Boolean) {
+        locked = isLocked
+        // Task 17: aplicar/retirar watchdog + lock task
     }
 
     private fun applyKioskWindowFlags() {
@@ -172,6 +185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        lockClient?.stop()
         tts?.stop()
         tts?.shutdown()
         super.onDestroy()
