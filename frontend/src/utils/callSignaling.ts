@@ -1,4 +1,5 @@
 import { STORAGE_BASE_URL } from '../services/apiService';
+import { getDoorbellId } from './doorbell';
 
 type SignalingMessage = { type: string; to?: string; from?: string; [key: string]: any };
 type Handler = (msg: SignalingMessage) => void;
@@ -6,7 +7,7 @@ type Handler = (msg: SignalingMessage) => void;
 const DEVICE_ID_KEY = 'campainha_device_id';
 
 export function getOrCreateDeviceId(role: 'kiosk' | 'resident'): string {
-  if (role === 'kiosk') return 'kiosk';
+  if (role === 'kiosk') return `kiosk:${getDoorbellId()}`;
   let id = localStorage.getItem(DEVICE_ID_KEY);
   if (!id) {
     id = crypto.randomUUID();

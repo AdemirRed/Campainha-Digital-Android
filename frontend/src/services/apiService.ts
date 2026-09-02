@@ -188,6 +188,31 @@ class ApiService {
     });
   }
 
+  // Doorbells
+  async getDoorbells(): Promise<import('@shared/types/doorbell').Doorbell[]> {
+    return this.request('/doorbells');
+  }
+  async createDoorbell(name: string): Promise<import('@shared/types/doorbell').Doorbell> {
+    return this.request('/doorbells', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+  async renameDoorbell(id: number, name: string): Promise<import('@shared/types/doorbell').Doorbell> {
+    return this.request(`/doorbells/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+  async deleteDoorbell(id: number): Promise<void> {
+    await this.request(`/doorbells/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // Face recognition (processed server-side)
   async getFaceDescriptor(imageBase64: string): Promise<number[]> {
     const result = await this.request<{ descriptor: number[] }>('/face/descriptor', {
