@@ -26,25 +26,32 @@ function wasActivatedBefore(): boolean {
 
 type CallPhase = 'idle' | 'ringing' | 'connecting' | 'connected' | 'ended';
 
-function describeEvent(event: Event): string | null {
-  if (event.type === EventType.RESIDENT_IDENTIFIED) {
-    return `${event.metadata?.name || 'Alguém'} chegou em casa`;
-  }
-  if (event.type === EventType.PERSON_DETECTED && event.metadata?.recognized === false) {
-    return 'Visitante não identificado na porta';
-  }
-  if (event.type === EventType.BUTTON_PRESSED && event.metadata?.reason === 'other') {
-    if (!event.metadata?.message) return 'Novo recado de áudio na porta';
-    // A full assistant/visitor transcript is long - the banner/history
-    // line just gets a short preview, the full text renders formatted below.
-    const preview = (event.metadata.message as string).replace(/\s+/g, ' ').slice(0, 70);
-    return `Recado: "${preview}${preview.length === 70 ? '...' : ''}"`;
-  }
-  if (event.type === EventType.DELIVERY_SELECTED) {
-    const company = event.metadata?.company;
-    return company ? `Entrega registrada na porta (${company})` : 'Entrega registrada na porta';
-  }
-  return null;
+export function describeEvent(event: Event, doorbellNames?: Record<number, string>): string | null {
+  const core = (): string | null => {
+    if (event.type === EventType.RESIDENT_IDENTIFIED) {
+      return `${event.metadata?.name || 'Alguém'} chegou em casa`;
+    }
+    if (event.type === EventType.PERSON_DETECTED && event.metadata?.recognized === false) {
+      return 'Visitante não identificado na porta';
+    }
+    if (event.type === EventType.BUTTON_PRESSED && event.metadata?.reason === 'other') {
+      if (!event.metadata?.message) return 'Novo recado de áudio na porta';
+      // A full assistant/visitor transcript is long - the banner/history
+      // line just gets a short preview, the full text renders formatted below.
+      const preview = (event.metadata.message as string).replace(/\s+/g, ' ').slice(0, 70);
+      return `Recado: "${preview}${preview.length === 70 ? '...' : ''}"`;
+    }
+    if (event.type === EventType.DELIVERY_SELECTED) {
+      const company = event.metadata?.company;
+      return company ? `Entrega registrada na porta (${company})` : 'Entrega registrada na porta';
+    }
+    return null;
+  };
+  const text = core();
+  if (!text) return null;
+  const id = event.metadata?.doorbellId as number | undefined;
+  const name = id && doorbellNames ? doorbellNames[id] : undefined;
+  return name ? `${name}: ${text}` : text;
 }
 
 
@@ -82,6 +89,23 @@ export function NotificationsPage() {
   const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const [live, setLive] = useState<{ label: string; frameBase64: string } | null>(null);
   const lastSeenIdRef = useRef<number | null>(null);
+
+  // Doorbell names, loaded once, so banners can be prefixed with which
+  // door the event came from ("Fundos: Recado ..."). Read in poll() via a
+  // ref so the poll effect's dependency array doesn't need to change.
+  const [doorbellNames, setDoorbellNames] = useState<Record<number, string>>({});
+  const doorbellNamesRef = useRef<Record<number, string>>({});
+  useEffect(() => {
+    doorbellNamesRef.current = doorbellNames;
+  }, [doorbellNames]);
+  useEffect(() => {
+    apiService
+      .getDoorbells()
+      .then((list) => {
+        setDoorbellNames(Object.fromEntries(list.map((d) => [d.id, d.name])));
+      })
+      .catch(() => {});
+  }, []);
 
   // Real WebRTC call state - this device being rung by the kiosk.
   const [callPhase, setCallPhase] = useState<CallPhase>('idle');
@@ -141,7 +165,7 @@ export function NotificationsPage() {
         lastSeenIdRef.current = items[0].id;
 
         for (const event of fresh) {
-          const text = describeEvent(event);
+          const text = describeEvent(event, doorbellNamesRef.current);
           if (!text) continue;
 
           if (cancelled) return;

@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "build:termux": "node scripts/build-termux.mjs",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -22,6 +23,7 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.11",
     "vite-plugin-pwa": "^0.17.4",
+    "vitest": "^2.1.0",
     "workbox-precaching": "^7.4.1"
   }
 }

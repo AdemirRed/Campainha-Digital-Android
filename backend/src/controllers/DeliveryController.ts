@@ -48,7 +48,7 @@ export class DeliveryController {
       if (!data.event_id) {
         const event = this.eventRepo.create({
           type: EventType.DELIVERY_SELECTED,
-          metadata: { company: data.company, photoFile: photoPath }
+          metadata: { company: data.company, photoFile: photoPath, doorbellId: Number(req.body.doorbellId) || undefined }
         });
         data.event_id = event.id;
       }

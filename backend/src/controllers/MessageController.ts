@@ -44,7 +44,8 @@ export class MessageController {
         metadata: {
           reason: 'other',
           message: text || null,
-          audioFile
+          audioFile,
+          doorbellId: Number(req.body.doorbellId) || undefined
         }
       });
 

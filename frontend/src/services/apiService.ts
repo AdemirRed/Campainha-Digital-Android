@@ -10,6 +10,17 @@ const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 // "<origin>/storage/...". Strip the "/api" suffix to get the origin.
 export const STORAGE_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
+function kioskDoorbellId(): number {
+  try {
+    // import estático causaria ciclo com doorbell.ts; leitura direta do storage
+    const raw = localStorage.getItem('campainha_doorbell_id');
+    const n = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  } catch {
+    return 1;
+  }
+}
+
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
@@ -51,7 +62,7 @@ class ApiService {
   async createEvent(event: CreateEventDTO): Promise<Event> {
     return this.request<Event>('/events', {
       method: 'POST',
-      body: JSON.stringify(event),
+      body: JSON.stringify({ ...event, metadata: { ...(event.metadata || {}), doorbellId: kioskDoorbellId() } }),
     });
   }
 
@@ -71,7 +82,7 @@ class ApiService {
   async createDelivery(delivery: Partial<CreateDeliveryDTO>): Promise<Delivery> {
     return this.request<Delivery>('/deliveries', {
       method: 'POST',
-      body: JSON.stringify(delivery),
+      body: JSON.stringify({ ...delivery, doorbellId: kioskDoorbellId() }),
     });
   }
 
@@ -239,15 +250,15 @@ class ApiService {
   async sendMessage(message: { text?: string; audioBase64?: string }): Promise<Event> {
     return this.request<Event>('/messages', {
       method: 'POST',
-      body: JSON.stringify(message),
+      body: JSON.stringify({ ...message, doorbellId: kioskDoorbellId() }),
     });
   }
 
   // Short video clip of a visitor the face recognition couldn't match
-  async recordUnrecognizedVisit(videoBase64: string): Promise<Event> {
+  async recordUnrecognizedVisit(videoBase64: string, photoBase64?: string): Promise<Event> {
     return this.request<Event>('/visitors/unrecognized', {
       method: 'POST',
-      body: JSON.stringify({ videoBase64 }),
+      body: JSON.stringify({ videoBase64, photoBase64, doorbellId: kioskDoorbellId() }),
     });
   }
 

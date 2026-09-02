@@ -36,6 +36,13 @@ export class EventController {
         return;
       }
 
+      // Stamp which doorbell this event came from, when the kiosk sends it
+      // (optional - resident-side callers omit it).
+      const doorbellId = Number((req.body as any).doorbellId);
+      if (Number.isFinite(doorbellId) && doorbellId > 0) {
+        data.metadata = { ...(data.metadata || {}), doorbellId };
+      }
+
       const event = this.eventRepo.create(data);
 
       // Emit event to EventBus

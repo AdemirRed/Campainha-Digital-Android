@@ -37,7 +37,7 @@ export class VisitorController {
 
       const event = this.eventRepo.create({
         type: EventType.PERSON_DETECTED,
-        metadata: { recognized: false, videoFile }
+        metadata: { recognized: false, videoFile, doorbellId: Number(req.body.doorbellId) || undefined }
       });
 
       res.status(201).json({
