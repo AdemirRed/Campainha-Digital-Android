@@ -93,13 +93,17 @@ export class VisitorFaceController {
 
       this.visitorRepo.markSeen(match.visitor.id);
 
-      const { doorbellId } = req.body;
-      new VisitsRepository().create({
-        visitor_id: match.visitor.id,
-        descriptor,
-        doorbell_id: Number(doorbellId) || null,
-        name_snapshot: match.visitor.name,
-      });
+      try {
+        const { doorbellId } = req.body;
+        new VisitsRepository().create({
+          visitor_id: match.visitor.id,
+          descriptor,
+          doorbell_id: Number(doorbellId) || null,
+          name_snapshot: match.visitor.name,
+        });
+      } catch {
+        // visita é best-effort — não derruba a resposta do reconhecimento
+      }
 
       res.json({ success: true, data: this.visitorRepo.findById(match.visitor.id) } as ApiResponse);
     } catch (error: any) {
