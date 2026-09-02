@@ -132,6 +132,24 @@ export function runMigrations(db: SqlJsDatabase): void {
         );
         INSERT INTO doorbells (id, name, device_key) VALUES (1, 'Campainha', 'kiosk-1');
       `
+    },
+    {
+      name: '010_create_visits_table',
+      sql: `
+        CREATE TABLE IF NOT EXISTS visits (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          visitor_id INTEGER,
+          descriptor TEXT,
+          photo_path TEXT,
+          event_id INTEGER,
+          doorbell_id INTEGER,
+          name_snapshot TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_visits_visitor_id ON visits(visitor_id);
+        CREATE INDEX IF NOT EXISTS idx_visits_created_at ON visits(created_at);
+        CREATE INDEX IF NOT EXISTS idx_visits_doorbell_id ON visits(doorbell_id);
+      `
     }
   ];
 
