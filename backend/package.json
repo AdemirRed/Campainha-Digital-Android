@@ -8,7 +8,8 @@
     "build": "tsc && node scripts/post-build.mjs",
     "start": "node dist/backend/src/bootstrap.js",
     "type-check": "tsc --noEmit",
-    "migrate": "tsx src/database/migrate.ts"
+    "migrate": "tsx src/database/migrate.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -36,6 +37,7 @@
     "@types/web-push": "^3.6.4",
     "@types/ws": "^8.18.1",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.0"
   }
 }
