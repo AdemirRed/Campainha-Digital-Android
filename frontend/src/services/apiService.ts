@@ -307,6 +307,31 @@ class ApiService {
     });
   }
 
+  // Visitors / Visits
+  async getVisitors(): Promise<any[]> {
+    return this.request('/visitors');
+  }
+  async renameVisitor(id: number, name: string): Promise<any> {
+    return this.request(`/visitors/${id}`, {
+      method: 'PATCH', body: JSON.stringify({ name }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+  async getVisitorVisits(id: number): Promise<import('@shared/types/visit').Visit[]> {
+    return this.request(`/visitors/${id}/visits`);
+  }
+  async getVisits(page: number, pageSize = 20, doorbellId?: number): Promise<{ items: import('@shared/types/visit').Visit[]; total: number }> {
+    const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (doorbellId) q.set('doorbellId', String(doorbellId));
+    return this.request(`/visits?${q.toString()}`);
+  }
+  async nameVisit(visitId: number, name: string): Promise<{ visitorId: number }> {
+    return this.request(`/visits/${visitId}/name`, {
+      method: 'POST', body: JSON.stringify({ name }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // AI assistant (Ollama Cloud) - talks to unrecognized visitors and
   // summarizes recent activity for recognized residents
   async chatWithAssistant(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string> {
