@@ -67,6 +67,8 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "kiosk_prefs"
         private const val KEY_URL = "kiosk_url"
         private const val KEY_PIN = "kiosk_pin"
+        private const val KEY_DOORBELL = "doorbell_id"
+        private const val DEFAULT_DOORBELL = 1
         private const val CAMERA_MIC_REQUEST_CODE = 100
     }
 
@@ -84,7 +86,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.exitGestureZone).setOnClickListener { onExitZoneTapped() }
 
         requestRuntimePermissions()
-        webView.loadUrl(currentUrl())
+        webView.loadUrl(urlWithDoorbell())
     }
 
     private fun applyKioskWindowFlags() {
@@ -177,6 +179,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun currentUrl(): String = prefs.getString(KEY_URL, DEFAULT_URL) ?: DEFAULT_URL
     private fun currentPin(): String = prefs.getString(KEY_PIN, DEFAULT_PIN) ?: DEFAULT_PIN
+    private fun currentDoorbellId(): Int = prefs.getInt(KEY_DOORBELL, DEFAULT_DOORBELL)
+
+    private fun urlWithDoorbell(): String {
+        val baseUrl = currentUrl()
+        val sep = if (baseUrl.contains("?")) "&" else "?"
+        return "$baseUrl${sep}doorbell=${currentDoorbellId()}"
+    }
 
     private fun onExitZoneTapped() {
         val now = System.currentTimeMillis()
@@ -210,15 +219,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAdminMenu() {
-        val options = arrayOf("Recarregar página", "Trocar URL", "Trocar PIN", "Sair do app")
+        val options = arrayOf("Recarregar página", "Trocar URL", "Trocar PIN", "ID da campainha", "Desbloquear 15 min", "Sair do app")
         AlertDialog.Builder(this)
             .setTitle("Menu do administrador")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> webView.loadUrl(currentUrl())
+                    0 -> webView.loadUrl(urlWithDoorbell())
                     1 -> promptForUrl()
                     2 -> promptForNewPin()
-                    3 -> finishAffinity()
+                    3 -> promptForDoorbellId()
+                    4 -> { /* Task 19: desbloqueio local */ }
+                    5 -> { /* Task 19: gate por locked */ finishAffinity() }
                 }
             }
             .setNegativeButton("Fechar", null)
@@ -237,7 +248,7 @@ class MainActivity : AppCompatActivity() {
                 val newUrl = input.text.toString().trim()
                 if (newUrl.isNotEmpty()) {
                     prefs.edit().putString(KEY_URL, newUrl).apply()
-                    webView.loadUrl(newUrl)
+                    webView.loadUrl(urlWithDoorbell())
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -255,6 +266,24 @@ class MainActivity : AppCompatActivity() {
                 val newPin = input.text.toString().trim()
                 if (newPin.length in 4..8) {
                     prefs.edit().putString(KEY_PIN, newPin).apply()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun promptForDoorbellId() {
+        val input = EditText(this)
+        input.inputType = InputType.TYPE_CLASS_NUMBER
+        input.setText(currentDoorbellId().toString())
+        AlertDialog.Builder(this)
+            .setTitle("ID da campainha")
+            .setView(input)
+            .setPositiveButton("Salvar") { _, _ ->
+                val n = input.text.toString().trim().toIntOrNull()
+                if (n != null && n > 0) {
+                    prefs.edit().putInt(KEY_DOORBELL, n).apply()
+                    webView.loadUrl(urlWithDoorbell())
                 }
             }
             .setNegativeButton("Cancelar", null)
