@@ -15,8 +15,9 @@ interface WatchSession {
   idleTimer: ReturnType<typeof setTimeout>;
 }
 
-export function useKioskLiveHost(): void {
+export function useKioskLiveHost(enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     let client: CallSignalingClient | null = null;
     let session: WatchSession | null = null;
@@ -128,5 +129,5 @@ export function useKioskLiveHost(): void {
       teardown();
       client?.close();
     };
-  }, []);
+  }, [enabled]);
 }

@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { usePreventNavigation } from './hooks/usePreventNavigation';
+import { useKioskLiveHost } from './hooks/useKioskLiveHost';
+import { isKioskDevice } from './utils/doorbell';
 import HomePage from './pages/HomePage';
 import DeliveryPage from './pages/DeliveryPage';
 import DeliveryCodePage from './pages/DeliveryCodePage';
@@ -12,6 +14,7 @@ import RealCallPage from './pages/RealCallPage';
 
 function App() {
   usePreventNavigation();
+  useKioskLiveHost(isKioskDevice());
 
   return (
     <BrowserRouter>

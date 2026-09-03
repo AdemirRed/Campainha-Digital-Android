@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMotionDetector } from '../hooks/useMotionDetector';
 import { useContinuousRecording } from '../hooks/useContinuousRecording';
-import { useKioskLiveHost } from '../hooks/useKioskLiveHost';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { speak } from '../utils/speech';
@@ -38,8 +37,6 @@ export function StandbyPage() {
   // conversation, so that flow can bail out cleanly instead of saving a
   // pointless message/clip for someone who turned out to be a resident.
   const interruptedByResidentRef = useRef(false);
-
-  useKioskLiveHost();
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
   useContinuousRecording(videoRef, !cameraError);

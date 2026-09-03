@@ -151,6 +151,17 @@ export function runMigrations(db: SqlJsDatabase): void {
         CREATE INDEX IF NOT EXISTS idx_visits_doorbell_id ON visits(doorbell_id);
       `
     }
+    ,{
+      name: '011_backfill_visits_from_unrecognized_events',
+      sql: `
+        INSERT INTO visits (visitor_id, descriptor, photo_path, event_id, doorbell_id, name_snapshot, created_at)
+        SELECT NULL, NULL, NULL, e.id, NULL, 'Desconhecido', e.created_at
+        FROM events e
+        WHERE e.type = 'person_detected'
+          AND e.metadata LIKE '%"recognized":false%'
+          AND NOT EXISTS (SELECT 1 FROM visits v WHERE v.event_id = e.id);
+      `
+    }
   ];
 
   for (const migration of migrations) {
