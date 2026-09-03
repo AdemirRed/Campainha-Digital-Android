@@ -327,7 +327,9 @@ class ApiService {
   async getVisits(page: number, pageSize = 20, doorbellId?: number): Promise<{ items: import('@shared/types/visit').Visit[]; total: number }> {
     const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (doorbellId) q.set('doorbellId', String(doorbellId));
-    return this.request(`/visits?${q.toString()}`);
+    return this.request(`/visits?${q.toString()}`, {
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
   }
   async nameVisit(visitId: number, name: string): Promise<{ visitorId: number }> {
     return this.request(`/visits/${visitId}/name`, {

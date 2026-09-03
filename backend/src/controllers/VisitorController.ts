@@ -93,14 +93,19 @@ export class VisitorController {
 
   listVisits = (req: Request, res: Response): void => {
     const id = Number(req.params.id);
-    res.json({ success: true, data: new VisitsRepository().listByVisitor(id) } as ApiResponse);
+    const rows = new VisitsRepository().listByVisitor(id);
+    res.json({ success: true, data: rows.map(({ descriptor, ...rest }) => rest) } as ApiResponse);
   };
 
   timeline = (req: Request, res: Response): void => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 20));
     const doorbellId = req.query.doorbellId ? Number(req.query.doorbellId) : undefined;
-    res.json({ success: true, data: new VisitsRepository().listTimeline(page, pageSize, doorbellId) } as ApiResponse);
+    const result = new VisitsRepository().listTimeline(page, pageSize, doorbellId);
+    res.json({
+      success: true,
+      data: { items: result.items.map(({ descriptor, ...rest }) => rest), total: result.total },
+    } as ApiResponse);
   };
 
   nameVisit = (req: Request, res: Response): void => {

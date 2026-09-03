@@ -107,11 +107,7 @@ class MainActivity : AppCompatActivity() {
         requestRuntimePermissions()
         webView.loadUrl(urlWithDoorbell())
 
-        val host = currentUrl().removeSuffix("/")
-        lockClient = KioskLockClient(host, currentDoorbellId(), prefs) { isLocked ->
-            runOnUiThread { onLockStateChanged(isLocked) }
-        }
-        lockClient?.start()
+        bindLockClient()
 
         val savedLocal = prefs.getLong(KEY_LOCAL_UNLOCK, 0L)
         if (savedLocal > System.currentTimeMillis()) lockClient?.setLocalUnlockUntil(savedLocal)
@@ -119,6 +115,16 @@ class MainActivity : AppCompatActivity() {
         // O KioskLockClient pode ainda não ter respondido; tudo bem,
         // onLockStateChanged re-chama quando o estado chegar.
         if (locked) tryStartLockTask() // Task 18
+    }
+
+    // (Re)creates the lock client against the current host + doorbell id.
+    private fun bindLockClient() {
+        lockClient?.stop()
+        val host = currentUrl().removeSuffix("/")
+        lockClient = KioskLockClient(host, currentDoorbellId(), prefs) { isLocked ->
+            runOnUiThread { onLockStateChanged(isLocked) }
+        }
+        lockClient?.start()
     }
 
     private fun onLockStateChanged(isLocked: Boolean) {
@@ -363,13 +369,15 @@ class MainActivity : AppCompatActivity() {
                 val n = input.text.toString().trim().toIntOrNull()
                 if (n != null && n > 0) {
                     // limpa o estado de trava persistido da campainha anterior
-                    // (chaves de KioskLockClient) para o próximo launch não
-                    // restaurar o estado de outra campainha
+                    // (chaves de KioskLockClient + unlock local) para o
+                    // próximo launch não restaurar o estado de outra campainha
                     prefs.edit()
                         .putInt(KEY_DOORBELL, n)
                         .remove("srv_locked")
                         .remove("srv_unlock_until")
+                        .remove(KEY_LOCAL_UNLOCK)
                         .apply()
+                    bindLockClient()
                     webView.loadUrl(urlWithDoorbell())
                 }
             }

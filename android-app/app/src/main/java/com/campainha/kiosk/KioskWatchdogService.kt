@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import androidx.core.app.NotificationCompat
 
 class KioskWatchdogService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -52,11 +53,12 @@ class KioskWatchdogService : Service() {
                 NotificationChannel(channelId, "Campainha ativa", NotificationManager.IMPORTANCE_LOW)
             )
         }
-        return Notification.Builder(this, channelId)
+        return NotificationCompat.Builder(this, channelId)
             .setContentTitle("Campainha ativa")
             .setContentText("O modo campainha está ligado neste aparelho.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
     }
 

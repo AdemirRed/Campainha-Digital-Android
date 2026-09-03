@@ -34,21 +34,29 @@ export function useLiveViewer(targetDoorbellId: number) {
 
   const dispatch = useCallback((a: LiveViewerAction) => setState((s) => liveViewerReducer(s, a)), []);
 
-  const stop = useCallback(() => {
+  // Non-dispatch teardown: releases every resource but leaves the state
+  // machine alone, so callers can follow it with whatever action fits
+  // (stop → idle, busy, error, ...). Nulling clientRef is what makes a
+  // later start() work again (it early-returns while clientRef is set).
+  const teardown = useCallback(() => {
     const client = clientRef.current;
     if (client && watchIdRef.current) {
       client.send({ type: 'watch-end', to: `kiosk:${targetDoorbellId}:live`, watchId: watchIdRef.current });
     }
-    if (timersRef.current.req) clearTimeout(timersRef.current.req);
-    if (timersRef.current.ping) clearInterval(timersRef.current.ping);
+    if (timersRef.current.req) { clearTimeout(timersRef.current.req); timersRef.current.req = undefined; }
+    if (timersRef.current.ping) { clearInterval(timersRef.current.ping); timersRef.current.ping = undefined; }
     pcRef.current?.close();
     pcRef.current = null;
     client?.close();
     clientRef.current = null;
     watchIdRef.current = '';
+  }, [targetDoorbellId]);
+
+  const stop = useCallback(() => {
+    teardown();
     dispatch({ type: 'stop' });
     setErrorMsg(null);
-  }, [dispatch, targetDoorbellId]);
+  }, [teardown, dispatch]);
 
   // Terminal failure: tear everything down (so a later start() is not a
   // no-op on the `if (clientRef.current) return` guard) then surface the
@@ -71,8 +79,9 @@ export function useLiveViewer(targetDoorbellId: number) {
 
     client.on('watch-busy', (msg) => {
       if (msg.watchId !== watchId) return;
-      if (timersRef.current.req) { clearTimeout(timersRef.current.req); timersRef.current.req = undefined; }
-      if (timersRef.current.ping) { clearInterval(timersRef.current.ping); timersRef.current.ping = undefined; }
+      // Tear the client down so a later start() from 'busy' is not a
+      // permanent no-op (start() early-returns while clientRef is set).
+      teardown();
       dispatch({ type: 'busy' });
     });
     client.on('watch-error', (msg) => {
@@ -122,7 +131,7 @@ export function useLiveViewer(targetDoorbellId: number) {
     timersRef.current.req = setTimeout(() => {
       fail('A campainha não respondeu');
     }, REQUEST_TIMEOUT_MS);
-  }, [dispatch, targetDoorbellId, fail]);
+  }, [dispatch, targetDoorbellId, fail, teardown]);
 
   useEffect(() => () => stop(), [stop]);
 

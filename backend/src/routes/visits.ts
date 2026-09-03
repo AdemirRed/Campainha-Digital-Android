@@ -5,7 +5,7 @@ import { auth } from '../middleware/auth';
 export function createVisitsRouter(): Router {
   const router = Router();
   const c = new VisitorController();
-  router.get('/', c.timeline);
+  router.get('/', auth, c.timeline);
   router.post('/:id/name', auth, c.nameVisit);
   return router;
 }

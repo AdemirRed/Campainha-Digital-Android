@@ -37,14 +37,31 @@ describe('rotas de visitantes/visitas', () => {
     expect(b.data.name).toBe('Beto');
   });
 
-  it('GET /api/visits pagina e /api/visitors/:id/visits filtra', async () => {
+  it('GET /api/visits pagina e /api/visitors/:id/visits filtra (com auth, sem descriptor)', async () => {
     const vr = new VisitsRepository();
-    vr.create({ visitor_id: 5, doorbell_id: 1, name_snapshot: 'a' });
+    vr.create({ visitor_id: 5, descriptor: [0.1, 0.2], doorbell_id: 1, name_snapshot: 'a' });
     vr.create({ visitor_id: null, doorbell_id: 1, name_snapshot: 'Desconhecido' });
-    const tl = await (await fetch(`${base}/api/visits?page=1&pageSize=10`)).json();
+    const tl = await (await fetch(`${base}/api/visits?page=1&pageSize=10`, { headers: H })).json();
     expect(tl.data.total).toBe(2);
+    expect(tl.data.items.every((v: any) => !('descriptor' in v))).toBe(true);
     const byV = await (await fetch(`${base}/api/visitors/5/visits`, { headers: H })).json();
     expect(byV.data).toHaveLength(1);
+    expect(byV.data.every((v: any) => !('descriptor' in v))).toBe(true);
+  });
+
+  it('GET /api/visits sem token retorna 401', async () => {
+    const res = await fetch(`${base}/api/visits?page=1&pageSize=10`);
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/visits e /api/visitors/:id/visits não expõem descriptor', async () => {
+    const vr = new VisitsRepository();
+    vr.create({ visitor_id: 7, descriptor: [0.3, 0.4, 0.5], doorbell_id: 1, name_snapshot: 'z' });
+    const tl = await (await fetch(`${base}/api/visits?page=1&pageSize=10`, { headers: H })).json();
+    expect(tl.data.items).toHaveLength(1);
+    expect(tl.data.items[0]).not.toHaveProperty('descriptor');
+    const byV = await (await fetch(`${base}/api/visitors/7/visits`, { headers: H })).json();
+    expect(byV.data[0]).not.toHaveProperty('descriptor');
   });
 
   it('POST /api/visits/:id/name cria visitante pelo descriptor e vincula', async () => {
