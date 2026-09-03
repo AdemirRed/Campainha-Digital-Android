@@ -57,4 +57,13 @@ describe('/api/doorbells', () => {
     const del1 = await fetch(`${base}/api/doorbells/1`, { method: 'DELETE', headers: h });
     expect(del1.status).toBe(400);
   });
+
+  it('DELETE com id não-numérico → 400', async () => {
+    const h = { 'Content-Type': 'application/json', Authorization: 'Bearer test-token' };
+    const res = await fetch(`${base}/api/doorbells/abc`, { method: 'DELETE', headers: h });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('ID inválido');
+  });
 });

@@ -331,7 +331,7 @@ class ApiService {
       headers: { Authorization: `Bearer ${API_TOKEN}` },
     });
   }
-  async nameVisit(visitId: number, name: string): Promise<{ visitorId: number }> {
+  async nameVisit(visitId: number, name: string): Promise<{ visitorId: number | null }> {
     return this.request(`/visits/${visitId}/name`, {
       method: 'POST', body: JSON.stringify({ name }),
       headers: { Authorization: `Bearer ${API_TOKEN}` },

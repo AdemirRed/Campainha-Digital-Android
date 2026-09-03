@@ -30,8 +30,8 @@ export class VisitsRepository {
   }
 
   listTimeline(page: number, pageSize: number, doorbellId?: number): { items: Visit[]; total: number } {
-    const where = doorbellId ? 'WHERE doorbell_id = ?' : '';
-    const args = doorbellId ? [doorbellId] : [];
+    const where = doorbellId != null ? 'WHERE doorbell_id = ?' : '';
+    const args = doorbellId != null ? [doorbellId] : [];
     const totalRes = this.db.exec(`SELECT COUNT(*) FROM visits ${where}`, args);
     const total = (totalRes[0]?.values[0][0] as number) ?? 0;
     const offset = (Math.max(1, page) - 1) * pageSize;

@@ -106,9 +106,23 @@ function KioskBlock({ doorbellId, showToast }: { doorbellId: number; showToast: 
 
   useEffect(() => {
     if (!state?.unlockUntil) { setRemaining(0); return; }
-    const tick = () => setRemaining(Math.max(0, new Date(state.unlockUntil!).getTime() - Date.now()));
-    tick();
-    const t = setInterval(tick, 1000);
+    const compute = () => Math.max(0, new Date(state.unlockUntil!).getTime() - Date.now());
+
+    const initial = compute();
+    setRemaining(initial);
+    if (initial <= 0) {
+      refresh(); // already expired - flip status to "Travado" promptly, no interval
+      return;
+    }
+
+    const t = setInterval(() => {
+      const left = compute();
+      setRemaining(left);
+      if (left <= 0) {
+        clearInterval(t);
+        refresh();
+      }
+    }, 1000);
     return () => clearInterval(t);
   }, [state?.unlockUntil]);
 

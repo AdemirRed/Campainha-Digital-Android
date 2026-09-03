@@ -12,9 +12,6 @@ describe('liveViewerReducer', () => {
   it('requesting -> busy', () => {
     expect(liveViewerReducer('requesting', { type: 'busy' })).toBe('busy');
   });
-  it('requesting -> timeout -> error', () => {
-    expect(liveViewerReducer('requesting', { type: 'timeout' })).toBe('error');
-  });
   it('qualquer -> stop -> idle', () => {
     expect(liveViewerReducer('live', { type: 'stop' })).toBe('idle');
     expect(liveViewerReducer('error', { type: 'stop' })).toBe('idle');

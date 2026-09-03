@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { DoorbellRepository } from '../database/repositories/DoorbellRepository';
 import { computeLockState } from '../domain/kioskLock';
 import { sendToKiosk } from '../services/CallSignalingService';
+import { parseId } from '../utils/params';
 import { ApiResponse } from '@shared/types/api';
 
 export class KioskController {
@@ -24,7 +25,12 @@ export class KioskController {
   }
 
   getLock = (req: Request, res: Response): void => {
-    const state = this.stateFor(Number(req.params.doorbellId));
+    const id = parseId(req.params.doorbellId);
+    if (id === null) {
+      res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse);
+      return;
+    }
+    const state = this.stateFor(id);
     if (!state) {
       res.status(404).json({ success: false, error: 'Campainha não encontrada' } as ApiResponse);
       return;
@@ -33,7 +39,11 @@ export class KioskController {
   };
 
   unlock = (req: Request, res: Response): void => {
-    const id = Number(req.params.doorbellId);
+    const id = parseId(req.params.doorbellId);
+    if (id === null) {
+      res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse);
+      return;
+    }
     const minutes = Math.min(240, Math.max(1, Number(req.body?.minutes) || 15));
     const until = new Date(Date.now() + minutes * 60_000).toISOString();
     this.repo.setUnlockUntil(id, until);
@@ -41,13 +51,21 @@ export class KioskController {
   };
 
   lock = (req: Request, res: Response): void => {
-    const id = Number(req.params.doorbellId);
+    const id = parseId(req.params.doorbellId);
+    if (id === null) {
+      res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse);
+      return;
+    }
     this.repo.setUnlockUntil(id, null);
     this.pushAndRespond(id, res);
   };
 
   setLockEnabled = (req: Request, res: Response): void => {
-    const id = Number(req.params.doorbellId);
+    const id = parseId(req.params.doorbellId);
+    if (id === null) {
+      res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse);
+      return;
+    }
     this.repo.setLockEnabled(id, Boolean(req.body?.enabled));
     if (!req.body?.enabled) this.repo.setUnlockUntil(id, null);
     this.pushAndRespond(id, res);

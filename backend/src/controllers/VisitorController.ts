@@ -6,6 +6,7 @@ import { EventRepository } from '../database/repositories/EventRepository';
 import { VisitsRepository } from '../database/repositories/VisitsRepository';
 import { VisitorRepository } from '../database/repositories/VisitorRepository';
 import { EventType } from '@shared/types/event';
+import { parseId } from '../utils/params';
 import { ApiResponse } from '@shared/types/api';
 
 function base64ToBuffer(base64: string): Buffer {
@@ -46,7 +47,8 @@ export class VisitorController {
         fs.writeFileSync(path.join(photosPath, photoFile), base64ToBuffer(photoBase64));
       }
 
-      const dbId = Number(doorbellId) || undefined;
+      const dbCandidate = Number(doorbellId);
+      const dbId = Number.isFinite(dbCandidate) && dbCandidate > 0 ? dbCandidate : undefined;
       const event = this.eventRepo.create({
         type: EventType.PERSON_DETECTED,
         metadata: {
@@ -83,16 +85,18 @@ export class VisitorController {
   };
 
   rename = (req: Request, res: Response): void => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
+    if (id === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }
     const name = String(req.body?.name ?? '').trim();
-    if (!name) { res.status(400).json({ success: false, error: 'name é obrigatório' } as ApiResponse); return; }
+    if (!name) { res.status(400).json({ success: false, error: 'Nome é obrigatório' } as ApiResponse); return; }
     const updated = new VisitorRepository().rename(id, name);
     if (!updated) { res.status(404).json({ success: false, error: 'Visitante não encontrado' } as ApiResponse); return; }
     res.json({ success: true, data: updated } as ApiResponse);
   };
 
   listVisits = (req: Request, res: Response): void => {
-    const id = Number(req.params.id);
+    const id = parseId(req.params.id);
+    if (id === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }
     const rows = new VisitsRepository().listByVisitor(id);
     res.json({ success: true, data: rows.map(({ descriptor, ...rest }) => rest) } as ApiResponse);
   };
@@ -109,9 +113,10 @@ export class VisitorController {
   };
 
   nameVisit = (req: Request, res: Response): void => {
-    const visitId = Number(req.params.id);
+    const visitId = parseId(req.params.id);
+    if (visitId === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }
     const name = String(req.body?.name ?? '').trim();
-    if (!name) { res.status(400).json({ success: false, error: 'name é obrigatório' } as ApiResponse); return; }
+    if (!name) { res.status(400).json({ success: false, error: 'Nome é obrigatório' } as ApiResponse); return; }
     const visitsRepo = new VisitsRepository();
     const visitorRepo = new VisitorRepository();
     const visit = visitsRepo.findById(visitId);

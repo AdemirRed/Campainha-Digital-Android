@@ -37,10 +37,15 @@ export class EventController {
       }
 
       // Stamp which doorbell this event came from, when the kiosk sends it
-      // (optional - resident-side callers omit it).
-      const doorbellId = Number((req.body as any).doorbellId);
+      // (optional - resident-side callers omit it). The app nests it inside
+      // metadata; older/other callers may send it top-level.
+      const rawDoorbellId = data.metadata?.doorbellId ?? (req.body as any).doorbellId;
+      const doorbellId = Number(rawDoorbellId);
       if (Number.isFinite(doorbellId) && doorbellId > 0) {
         data.metadata = { ...(data.metadata || {}), doorbellId };
+      } else if (data.metadata && 'doorbellId' in data.metadata) {
+        // incoming nested value was garbage - don't persist it
+        delete (data.metadata as any).doorbellId;
       }
 
       const event = this.eventRepo.create(data);

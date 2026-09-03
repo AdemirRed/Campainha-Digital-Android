@@ -39,13 +39,14 @@ export class MessageController {
         fs.writeFileSync(path.join(audiosPath, audioFile), base64ToBuffer(audioBase64));
       }
 
+      const dbId = Number(req.body.doorbellId);
       const event = this.eventRepo.create({
         type: EventType.BUTTON_PRESSED,
         metadata: {
           reason: 'other',
           message: text || null,
           audioFile,
-          doorbellId: Number(req.body.doorbellId) || undefined
+          doorbellId: Number.isFinite(dbId) && dbId > 0 ? dbId : undefined
         }
       });
 

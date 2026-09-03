@@ -1,6 +1,3 @@
-import { apiService } from '../services/apiService';
-import type { Doorbell } from '@shared/types/doorbell';
-
 const KEY = 'campainha_doorbell_id';
 
 export function getDoorbellId(): number {
@@ -26,8 +23,4 @@ export function bootstrapDoorbellFromUrl(): void {
   } catch {
     // sem window/URL — ignora
   }
-}
-
-export async function fetchDoorbells(): Promise<Doorbell[]> {
-  return apiService.getDoorbells();
 }

@@ -46,9 +46,10 @@ export class DeliveryController {
 
       // If no event_id provided, create a new event
       if (!data.event_id) {
+        const dbId = Number(req.body.doorbellId);
         const event = this.eventRepo.create({
           type: EventType.DELIVERY_SELECTED,
-          metadata: { company: data.company, photoFile: photoPath, doorbellId: Number(req.body.doorbellId) || undefined }
+          metadata: { company: data.company, photoFile: photoPath, doorbellId: Number.isFinite(dbId) && dbId > 0 ? dbId : undefined }
         });
         data.event_id = event.id;
       }

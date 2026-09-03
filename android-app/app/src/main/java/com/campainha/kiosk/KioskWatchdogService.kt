@@ -56,7 +56,7 @@ class KioskWatchdogService : Service() {
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("Campainha ativa")
             .setContentText("O modo campainha está ligado neste aparelho.")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_stat_campainha)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()

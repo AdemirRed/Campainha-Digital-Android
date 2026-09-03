@@ -90,7 +90,8 @@ export function NotificationsPage() {
   const [banner, setBanner] = useState<string | null>(null);
   const [history, setHistory] = useState<{ id: number; text: string; time: string; event: Event }[]>([]);
   const [live, setLive] = useState<{ label: string; frameBase64: string } | null>(null);
-  const [watchDoorbellId] = useState<number>(1); // uma campainha por ora
+  const [doorbellList, setDoorbellList] = useState<{ id: number; name: string }[]>([]);
+  const [watchDoorbellId, setWatchDoorbellId] = useState<number>(1);
   const liveView = useLiveViewer(watchDoorbellId);
   const lastSeenIdRef = useRef<number | null>(null);
 
@@ -107,6 +108,8 @@ export function NotificationsPage() {
       .getDoorbells()
       .then((list) => {
         setDoorbellNames(Object.fromEntries(list.map((d) => [d.id, d.name])));
+        setDoorbellList(list.map((d) => ({ id: d.id, name: d.name })));
+        if (list[0]) setWatchDoorbellId(list[0].id);
       })
       .catch(() => {});
   }, []);
@@ -395,6 +398,20 @@ export function NotificationsPage() {
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>
+          {doorbellList.length > 1 && (
+            <select
+              value={watchDoorbellId}
+              onChange={(e) => {
+                liveView.stop();
+                setWatchDoorbellId(Number(e.target.value));
+              }}
+              style={{ fontSize: 16, padding: 8, marginRight: 8 }}
+            >
+              {doorbellList.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          )}
           {liveView.state === 'idle' || liveView.state === 'error' || liveView.state === 'busy'
             ? <button className="btn btn-outline" onClick={liveView.start}>📷 Ver câmera ao vivo</button>
             : <button className="btn btn-outline" onClick={liveView.stop}>■ Parar câmera</button>}

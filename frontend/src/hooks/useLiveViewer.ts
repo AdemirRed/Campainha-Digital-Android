@@ -5,7 +5,7 @@ import { ICE_SERVERS } from '../utils/webrtcConfig';
 export type LiveViewerState = 'idle' | 'requesting' | 'busy' | 'connecting' | 'live' | 'error';
 export type LiveViewerAction =
   | { type: 'start' } | { type: 'offer' } | { type: 'connected' }
-  | { type: 'busy' } | { type: 'error' } | { type: 'stop' } | { type: 'timeout' };
+  | { type: 'busy' } | { type: 'error' } | { type: 'stop' };
 
 export function liveViewerReducer(state: LiveViewerState, action: LiveViewerAction): LiveViewerState {
   switch (action.type) {
@@ -14,7 +14,6 @@ export function liveViewerReducer(state: LiveViewerState, action: LiveViewerActi
     case 'offer': return state === 'requesting' ? 'connecting' : state;
     case 'connected': return state === 'connecting' ? 'live' : state;
     case 'busy': return state === 'requesting' ? 'busy' : state;
-    case 'timeout': return state === 'requesting' || state === 'connecting' ? 'error' : state;
     case 'error': return 'error';
     default: return state;
   }
