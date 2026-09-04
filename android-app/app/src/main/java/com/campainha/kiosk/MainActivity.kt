@@ -202,7 +202,16 @@ class MainActivity : AppCompatActivity() {
         // trusted single-purpose kiosk, not a general browser.
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread { request.grant(request.resources) }
+                // Grant synchronously - this callback already runs on the UI
+                // thread on modern WebView, and deferring it with
+                // runOnUiThread{} could let the PermissionRequest go stale,
+                // which showed up in the page as getUserMedia({audio:true})
+                // failing with "Could not start audio source".
+                try {
+                    request.grant(request.resources)
+                } catch (_: Exception) {
+                    try { request.deny() } catch (_: Exception) {}
+                }
             }
         }
 
