@@ -52,18 +52,26 @@ export function RealCallPage() {
     async function start() {
       try {
         localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        if (cancelled) {
-          localStream.getTracks().forEach((t) => t.stop());
+      } catch {
+        // Some devices fail to open the mic ("Could not start audio source" /
+        // NotReadableError) even though the camera is fine. Don't kill the
+        // call - fall back to a video-only call so the visitor can still
+        // see and be seen, and hear the resident.
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        } catch (err: any) {
+          setErrorMsg(`Não foi possível acessar a câmera: ${err.message || err.name}`);
+          setPhase('error');
           return;
         }
-        if (videoRef.current) {
-          videoRef.current.srcObject = localStream;
-          await videoRef.current.play();
-        }
-      } catch (err: any) {
-        setErrorMsg(`Não foi possível acessar câmera/microfone: ${err.message || err.name}`);
-        setPhase('error');
+      }
+      if (cancelled) {
+        localStream.getTracks().forEach((t) => t.stop());
         return;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = localStream;
+        await videoRef.current.play().catch(() => {});
       }
 
       // Try to recognize who's calling so the resident's device announces

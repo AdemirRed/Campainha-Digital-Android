@@ -272,7 +272,14 @@ export function NotificationsPage() {
     setCallPhase('connecting');
 
     try {
-      const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let localStream: MediaStream;
+      try {
+        localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        // No usable mic on this device - answer receive-only so the resident
+        // can still hear and see the visitor instead of the call failing.
+        localStream = new MediaStream();
+      }
       localStreamRef.current = localStream;
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
