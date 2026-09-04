@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { chatWithOllama, ChatMessage } from '../services/OllamaService';
+import { transcribeAudio } from '../services/TranscriptionService';
 import { EventRepository } from '../database/repositories/EventRepository';
 import { SettingsRepository } from '../database/repositories/SettingsRepository';
 import { EventType } from '@shared/types/event';
@@ -89,6 +90,21 @@ export class AssistantController {
       const reply = await chatWithOllama([{ role: 'system', content: systemPrompt }, ...messages]);
 
       res.json({ success: true, data: { reply } } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message } as ApiResponse);
+    }
+  }
+
+  // Speech-to-text for the kiosk WebView, which has no Web Speech API.
+  async transcribe(req: Request, res: Response): Promise<void> {
+    try {
+      const { audioBase64 } = req.body as { audioBase64?: string };
+      if (!audioBase64) {
+        res.status(400).json({ success: false, error: 'audioBase64 is required' } as ApiResponse);
+        return;
+      }
+      const text = await transcribeAudio(audioBase64);
+      res.json({ success: true, data: { text } } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message } as ApiResponse);
     }

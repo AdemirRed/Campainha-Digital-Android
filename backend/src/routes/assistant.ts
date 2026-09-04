@@ -6,6 +6,7 @@ export function createAssistantRouter(): Router {
   const assistantController = new AssistantController();
 
   router.post('/chat', assistantController.chat.bind(assistantController));
+  router.post('/transcribe', assistantController.transcribe.bind(assistantController));
   router.get('/summary', assistantController.summary.bind(assistantController));
 
   return router;

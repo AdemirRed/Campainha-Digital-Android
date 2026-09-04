@@ -348,6 +348,20 @@ class ApiService {
     return result.reply;
   }
 
+  // Server-side speech-to-text - used by the kiosk WebView, which has no
+  // Web Speech API. Returns '' on any failure (treated as "nothing said").
+  async transcribeAudio(audioBase64: string): Promise<string> {
+    try {
+      const result = await this.request<{ text: string }>('/assistant/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({ audioBase64 }),
+      });
+      return result.text || '';
+    } catch {
+      return '';
+    }
+  }
+
   async getAssistantSummary(): Promise<{ text: string; stats: any; messages?: string[] }> {
     return this.request<{ text: string; stats: any; messages?: string[] }>('/assistant/summary');
   }
