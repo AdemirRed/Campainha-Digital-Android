@@ -50,21 +50,31 @@ export function RealCallPage() {
     }
 
     async function start() {
-      try {
-        localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      } catch {
-        // Some devices fail to open the mic ("Could not start audio source" /
-        // NotReadableError) even though the camera is fine. Don't kill the
-        // call - fall back to a video-only call so the visitor can still
-        // see and be seen, and hear the resident.
+      // Try progressively less demanding audio setups - cheap/old phones
+      // often throw "Could not start audio source" (NotReadableError) on the
+      // default constraints but work with DSP turned off, and if the mic is
+      // truly unavailable we still place a video-only call rather than fail.
+      const attempts: MediaStreamConstraints[] = [
+        { video: true, audio: true },
+        { video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } },
+        { video: true, audio: false },
+      ];
+      let gotStream: MediaStream | null = null;
+      let lastErr: any = null;
+      for (const constraints of attempts) {
         try {
-          localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          gotStream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
         } catch (err: any) {
-          setErrorMsg(`Não foi possível acessar a câmera: ${err.message || err.name}`);
-          setPhase('error');
-          return;
+          lastErr = err;
         }
       }
+      if (!gotStream) {
+        setErrorMsg(`Não foi possível acessar a câmera: ${lastErr?.message || lastErr?.name || 'erro'}`);
+        setPhase('error');
+        return;
+      }
+      localStream = gotStream;
       if (cancelled) {
         localStream.getTracks().forEach((t) => t.stop());
         return;
