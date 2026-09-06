@@ -60,6 +60,16 @@ export function attachSignalingServer(server: HttpServer): void {
       const target = msg.to ? devices.get(msg.to) : null;
       if (target && target.ws.readyState === WebSocket.OPEN) {
         target.ws.send(JSON.stringify({ ...msg, from: deviceId }));
+        if (['accept-call', 'call-offer', 'call-answer', 'reject-call', 'call-end'].includes(msg.type)) {
+          logger.info(`[signal] ${msg.type} ${deviceId} -> ${msg.to} OK`);
+        }
+      } else if (
+        ['accept-call', 'call-offer', 'call-answer', 'reject-call', 'call-end'].includes(msg.type)
+      ) {
+        logger.warn(
+          `[signal] ${msg.type} ${deviceId} -> ${msg.to} DROPPED (not connected). ` +
+            `connected: ${[...devices.keys()].join(', ')}`,
+        );
       }
     });
 
