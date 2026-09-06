@@ -107,14 +107,20 @@ class MainActivity : AppCompatActivity() {
         requestRuntimePermissions()
         webView.loadUrl(urlWithDoorbell())
 
-        bindLockClient()
+        // Kiosk-lock plumbing must never crash the app on launch - on some
+        // newer devices/OEMs the foreground service or policy calls throw.
+        try {
+            bindLockClient()
 
-        val savedLocal = prefs.getLong(KEY_LOCAL_UNLOCK, 0L)
-        if (savedLocal > System.currentTimeMillis()) lockClient?.setLocalUnlockUntil(savedLocal)
+            val savedLocal = prefs.getLong(KEY_LOCAL_UNLOCK, 0L)
+            if (savedLocal > System.currentTimeMillis()) lockClient?.setLocalUnlockUntil(savedLocal)
 
-        // O KioskLockClient pode ainda não ter respondido; tudo bem,
-        // onLockStateChanged re-chama quando o estado chegar.
-        if (locked) tryStartLockTask() // Task 18
+            // O KioskLockClient pode ainda não ter respondido; tudo bem,
+            // onLockStateChanged re-chama quando o estado chegar.
+            if (locked) tryStartLockTask() // Task 18
+        } catch (e: Exception) {
+            android.util.Log.w("Campainha", "kiosk lock setup failed", e)
+        }
     }
 
     // (Re)creates the lock client against the current host + doorbell id.
@@ -129,12 +135,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun onLockStateChanged(isLocked: Boolean) {
         locked = isLocked
-        if (isLocked) {
-            KioskWatchdogService.start(applicationContext)
-            tryStartLockTask() // Task 18
-        } else {
-            KioskWatchdogService.stop(applicationContext)
-            tryStopLockTask()  // Task 18
+        try {
+            if (isLocked) {
+                KioskWatchdogService.start(applicationContext)
+                tryStartLockTask() // Task 18
+            } else {
+                KioskWatchdogService.stop(applicationContext)
+                tryStopLockTask()  // Task 18
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("Campainha", "onLockStateChanged failed", e)
         }
     }
 

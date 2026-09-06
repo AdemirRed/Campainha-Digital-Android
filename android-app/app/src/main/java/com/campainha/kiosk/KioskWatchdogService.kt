@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 
 class KioskWatchdogService : Service() {
@@ -34,7 +35,21 @@ class KioskWatchdogService : Service() {
         when (intent?.action) {
             ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
         }
-        startForeground(NOTIF_ID, buildNotification())
+        try {
+            // Android 14 (API 34) rejects the 2-arg startForeground for a
+            // service typed "specialUse" - it must be given the type. And a
+            // background start can still be refused (ForegroundServiceStart
+            // NotAllowedException) - either way, never crash the whole app;
+            // MainActivity's own onStop/onUserLeaveHint relaunch still runs.
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIF_ID, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(NOTIF_ID, buildNotification())
+            }
+        } catch (e: Exception) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         if (!running) { running = true; handler.post(tick) }
         return START_STICKY
     }
@@ -69,10 +84,17 @@ class KioskWatchdogService : Service() {
 
         fun start(ctx: Context) {
             val i = Intent(ctx, KioskWatchdogService::class.java).setAction(ACTION_START)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)
+            } catch (e: Exception) {
+                // e.g. started from the background on a device that forbids it
+            }
         }
         fun stop(ctx: Context) {
-            ctx.startService(Intent(ctx, KioskWatchdogService::class.java).setAction(ACTION_STOP))
+            try {
+                ctx.startService(Intent(ctx, KioskWatchdogService::class.java).setAction(ACTION_STOP))
+            } catch (e: Exception) {
+            }
         }
     }
 }
