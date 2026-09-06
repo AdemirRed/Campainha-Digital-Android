@@ -50,6 +50,41 @@ Limites (importante):
 
 const PRESENCE_STALE_HOURS = 12;
 
+const DELIVERY_COMPANY_LABELS: Record<string, string> = {
+  mercadolivre: 'Mercado Livre',
+  ifood: 'iFood',
+  shopee: 'Shopee',
+  correios: 'Correios',
+  amazon: 'Amazon',
+};
+
+// Feeds the resident's pre-registered delivery confirmation codes (the
+// number iFood / Mercado Livre couriers ask for) into the conversation.
+function buildDeliveryCodesInstruction(raw: string | null): string {
+  if (!raw) return '';
+  let codes: { company?: string; code?: string; note?: string }[];
+  try {
+    codes = JSON.parse(raw);
+  } catch {
+    return '';
+  }
+  if (!Array.isArray(codes) || codes.length === 0) return '';
+
+  const lines = codes
+    .filter((c) => c && c.company && c.code)
+    .map((c) => {
+      const label = DELIVERY_COMPANY_LABELS[c.company as string] || c.company;
+      return `- ${label}: código ${c.code}${c.note ? ` (${c.note})` : ''}`;
+    });
+  if (lines.length === 0) return '';
+
+  return `O morador deixou códigos de confirmação de entrega cadastrados:
+${lines.join('\n')}
+Se o visitante disser que é entregador de uma dessas empresas e pedir/precisar do código de
+confirmação, passe o código correspondente com naturalidade ("o código é X, pode confirmar aí").
+Não invente código para empresas que não estão na lista - nesse caso, ofereça registrar um recado.`;
+}
+
 function buildPresenceInstruction(presenceRaw: string | null): string {
   if (!presenceRaw) {
     return 'Se perguntarem se há alguém em casa, diga que não tem certeza no momento.';
@@ -91,10 +126,12 @@ export class AssistantController {
       // via the admin panel, applied to every conversation.
       const customInstructions = this.settingsRepo.get('assistant_instructions');
       const presenceInstruction = buildPresenceInstruction(this.settingsRepo.get('presence_status'));
+      const deliveryCodesInstruction = buildDeliveryCodesInstruction(this.settingsRepo.get('delivery_codes'));
 
       const systemPrompt = [
         BASE_VISITOR_PROMPT,
         presenceInstruction,
+        deliveryCodesInstruction,
         customInstructions ? `Instruções do morador para você seguir:\n${customInstructions}` : null,
       ]
         .filter(Boolean)

@@ -1,5 +1,6 @@
 export const DELIVERY_COMPANIES = [
   { value: 'mercadolivre', label: 'Mercado Livre', icon: '📦' },
+  { value: 'ifood', label: 'iFood', icon: '🍔' },
   { value: 'shopee', label: 'Shopee', icon: '🛍️' },
   { value: 'correios', label: 'Correios', icon: '📮' },
   { value: 'amazon', label: 'Amazon', icon: '📦' },

@@ -456,6 +456,29 @@ class ApiService {
     });
   }
 
+  // Delivery confirmation codes the resident registers in advance (the
+  // "código" iFood / Mercado Livre couriers ask for). Stored as a JSON
+  // array under the settings key 'delivery_codes'.
+  async getDeliveryCodes(): Promise<import('@shared/types/deliveryCode').DeliveryCode[]> {
+    try {
+      const result = await this.request<{ value: string | null }>('/settings/delivery_codes', {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      const arr = result.value ? JSON.parse(result.value) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async setDeliveryCodes(codes: import('@shared/types/deliveryCode').DeliveryCode[]): Promise<void> {
+    await this.request(`/settings/delivery_codes`, {
+      method: 'PUT',
+      body: JSON.stringify({ value: JSON.stringify(codes) }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // Resident-recorded presence status (e.g. "saí, volto às 21h"), used by
   // the assistant to answer visitors asking if someone is home
   async getPresenceStatus(): Promise<{ text: string; updatedAt: string } | null> {
