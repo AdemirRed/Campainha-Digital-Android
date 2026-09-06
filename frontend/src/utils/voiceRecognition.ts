@@ -36,6 +36,13 @@ export function isSpeechRecognitionSupported(): boolean {
   return getSpeechRecognitionCtor() !== null || canRecordAudio();
 }
 
+// True only when the browser has the real Web Speech API (Chrome/Android
+// Chrome). In the kiosk WebView this is false, so the assistant uses a
+// press-and-hold-to-talk button + server transcription instead.
+export function hasNativeSpeechRecognition(): boolean {
+  return getSpeechRecognitionCtor() !== null;
+}
+
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve) => {
     const reader = new FileReader();

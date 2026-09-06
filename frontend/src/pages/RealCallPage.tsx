@@ -90,8 +90,8 @@ export function RealCallPage() {
       try {
         if (videoRef.current) {
           const frame = captureVideoFrameAsBase64(videoRef.current);
-          const match = await apiService.recognizeFace(frame);
-          if (match) callerLabel = match.resident.name;
+          const scan = await apiService.recognizeFace(frame);
+          if (scan?.resident) callerLabel = scan.resident.name;
         }
       } catch {
         // no face in frame / recognition unavailable - ring generically

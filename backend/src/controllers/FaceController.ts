@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { computeFaceDescriptor, matchDescriptor } from '../services/FaceRecognitionService';
+import { computeFaceDescriptor, analyzeFace, matchDescriptor } from '../services/FaceRecognitionService';
 import { ResidentRepository } from '../database/repositories/ResidentRepository';
 import { ApiResponse } from '@shared/types/api';
 
@@ -41,26 +41,29 @@ export class FaceController {
         return;
       }
 
-      const descriptor = await computeFaceDescriptor(image);
+      const { faceDetected, box, descriptor } = await analyzeFace(image);
 
-      if (!descriptor) {
-        res.json({ success: true, data: null } as ApiResponse);
+      if (!faceDetected || !descriptor) {
+        // No person in frame - the kiosk must NOT treat this as a visitor.
+        res.json({
+          success: true,
+          data: { faceDetected: false, box: null, resident: null, isAdmin: false },
+        } as ApiResponse);
         return;
       }
 
       const residents = this.residentRepo.findAll();
       const match = await matchDescriptor(descriptor, residents);
 
-      if (!match) {
-        res.json({ success: true, data: null } as ApiResponse);
-        return;
-      }
-
       res.json({
         success: true,
         data: {
-          resident: { id: match.resident.id, name: match.resident.name, is_admin: match.resident.is_admin },
-          isAdmin: match.isAdmin,
+          faceDetected: true,
+          box,
+          resident: match
+            ? { id: match.resident.id, name: match.resident.name, is_admin: match.resident.is_admin }
+            : null,
+          isAdmin: match ? match.isAdmin : false,
         },
       } as ApiResponse);
     } catch (error: any) {

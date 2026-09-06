@@ -40,27 +40,55 @@ function base64ToBuffer(base64Image: string): Buffer {
   return Buffer.from(data, 'base64');
 }
 
-export async function computeFaceDescriptor(base64Image: string): Promise<number[] | null> {
+// Face box normalised to 0..1 of the source image, so the kiosk can draw
+// a tracking rectangle over its own <video> regardless of capture size.
+export interface FaceBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FaceAnalysis {
+  faceDetected: boolean;
+  box: FaceBox | null;
+  descriptor: number[] | null;
+}
+
+// Detect the single most prominent face and, if there is one, its
+// descriptor + bounding box. `faceDetected: false` explicitly means
+// "nobody in frame" - the kiosk uses that to NOT run the "não te
+// reconheci" flow when motion was just a car or a passer-by on the street.
+export async function analyzeFace(base64Image: string): Promise<FaceAnalysis> {
   await ensureModelsLoaded();
 
   const buffer = base64ToBuffer(base64Image);
-  logger.info(`computeFaceDescriptor: received ${buffer.length} bytes`);
-
   const image = await loadImage(buffer);
-  logger.info(`computeFaceDescriptor: decoded image ${image.width}x${image.height}`);
-
-  const rawDetections = await faceapi.detectAllFaces(
-    image,
-    new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
-  );
-  logger.info(`computeFaceDescriptor: tinyFaceDetector found ${rawDetections.length} face(s), scores=${rawDetections.map((d: any) => d.score.toFixed(2)).join(',')}`);
 
   const detection = await faceapi
     .detectSingleFace(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
     .withFaceLandmarks()
     .withFaceDescriptor();
 
-  return detection ? Array.from(detection.descriptor as Float32Array) : null;
+  if (!detection) {
+    return { faceDetected: false, box: null, descriptor: null };
+  }
+
+  const b = detection.detection.box;
+  return {
+    faceDetected: true,
+    box: {
+      x: b.x / image.width,
+      y: b.y / image.height,
+      width: b.width / image.width,
+      height: b.height / image.height,
+    },
+    descriptor: Array.from(detection.descriptor as Float32Array),
+  };
+}
+
+export async function computeFaceDescriptor(base64Image: string): Promise<number[] | null> {
+  return (await analyzeFace(base64Image)).descriptor;
 }
 
 export interface StoredResident {

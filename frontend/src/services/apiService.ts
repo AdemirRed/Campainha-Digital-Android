@@ -3,6 +3,21 @@ import { Event, CreateEventDTO } from '@shared/types/event';
 import { Resident, CreateResidentDTO } from '@shared/types/resident';
 import { ApiResponse, PaginatedResponse } from '@shared/types/api';
 
+// Face bounding box, normalised 0..1 of the source frame.
+export interface FaceBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface FaceScan {
+  faceDetected: boolean;
+  box: FaceBox | null;
+  resident: Resident | null;
+  isAdmin: boolean;
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const API_TOKEN = import.meta.env.VITE_API_TOKEN || '';
 
@@ -258,14 +273,19 @@ class ApiService {
     return result.descriptor;
   }
 
-  async recognizeFace(imageBase64: string): Promise<{ resident: Resident; isAdmin: boolean } | null> {
-    return this.request<{ resident: Resident; isAdmin: boolean } | null>('/face/recognize', {
-      method: 'POST',
-      body: JSON.stringify({ image: imageBase64 }),
-      headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
-      },
-    });
+  async recognizeFace(imageBase64: string): Promise<FaceScan | null> {
+    try {
+      return await this.request<FaceScan>('/face/recognize', {
+        method: 'POST',
+        body: JSON.stringify({ image: imageBase64 }),
+        headers: {
+          'Authorization': `Bearer ${API_TOKEN}`,
+        },
+      });
+    } catch {
+      // transient network/decoding error - caller retries within its window
+      return null;
+    }
   }
 
   // Free-text / audio message left by a visitor ("outro motivo")

@@ -5,11 +5,11 @@ import { useContinuousRecording } from '../hooks/useContinuousRecording';
 import { apiService } from '../services/apiService';
 import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 import { speak } from '../utils/speech';
-import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
+import { listenOnce, isSpeechRecognitionSupported, hasNativeSpeechRecognition } from '../utils/voiceRecognition';
 import { EventType } from '@shared/types/event';
 
 type Phase = 'dormant' | 'active' | 'conversing';
-type RecognizeResult = Awaited<ReturnType<typeof apiService.recognizeFace>>;
+type RecognizedResident = { resident: import('@shared/types/resident').Resident; isAdmin: boolean };
 
 const RECOGNITION_WINDOW_MS = 8000;
 const RECOGNITION_ATTEMPT_INTERVAL_MS = 1500;
@@ -29,6 +29,14 @@ export function StandbyPage() {
   const [phase, setPhase] = useState<Phase>('dormant');
   const [welcomeName, setWelcomeName] = useState<string | null>(null);
   const [subtitle, setSubtitle] = useState<string | null>(null);
+  // Normalised face box from the server (0..1), drawn over the preview.
+  const [faceBox, setFaceBox] = useState<import('../services/apiService').FaceBox | null>(null);
+  // Press-and-hold-to-talk state (kiosk WebView, which has no Web Speech API).
+  const [listening, setListening] = useState<'idle' | 'recording' | 'processing' | null>(null);
+  const holdResolveRef = useRef<((text: string) => void) | null>(null);
+  const holdRecorderRef = useRef<MediaRecorder | null>(null);
+  const holdStreamRef = useRef<MediaStream | null>(null);
+  const holdChunksRef = useRef<Blob[]>([]);
   const recognizingRef = useRef(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingAudioStreamRef = useRef<MediaStream | null>(null);
@@ -39,7 +47,9 @@ export function StandbyPage() {
   const interruptedByResidentRef = useRef(false);
 
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
-  useContinuousRecording(videoRef, !cameraError);
+  // Pause the rolling background recording while the visitor is holding
+  // the talk button - this phone's mic can't be opened twice at once.
+  useContinuousRecording(videoRef, !cameraError && listening === null);
 
   // converseWithVisitor() runs inside an async loop and needs the latest
   // motion reading at each step, not the value from when it started -
@@ -113,12 +123,111 @@ export function StandbyPage() {
     });
   }
 
-  // Recording and SpeechRecognition can't both hold the mic at once on
-  // this WebView - pause the segment for the listen window, then start a
-  // fresh one right after.
+  // Short "recording started" chirp so the visitor knows the button took.
+  function chirp() {
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AC();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, ctx.currentTime);
+      osc.frequency.setValueAtTime(990, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.24);
+    } catch {
+      // no Web Audio - the on-screen state still tells them it's recording
+    }
+  }
+
+  // --- Press-and-hold-to-talk (kiosk) --------------------------------------
+  async function startHoldRecording() {
+    if (listening !== 'idle') return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      holdStreamRef.current = stream;
+      holdChunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) holdChunksRef.current.push(e.data);
+      };
+      holdRecorderRef.current = rec;
+      rec.start();
+      chirp();
+      setListening('recording');
+    } catch {
+      // mic wouldn't open right now - treat as an empty answer
+      holdResolveRef.current?.('');
+    }
+  }
+
+  async function stopHoldRecording() {
+    if (listening !== 'recording') return;
+    setListening('processing');
+    const rec = holdRecorderRef.current;
+    const stream = holdStreamRef.current;
+    holdRecorderRef.current = null;
+    holdStreamRef.current = null;
+
+    const finish = async () => {
+      stream?.getTracks().forEach((t) => t.stop());
+      const chunks = holdChunksRef.current;
+      holdChunksRef.current = [];
+      if (chunks.length === 0) {
+        holdResolveRef.current?.('');
+        return;
+      }
+      const blob = new Blob(chunks, { type: rec?.mimeType || 'audio/webm' });
+      const dataUrl = await new Promise<string>((res) => {
+        const r = new FileReader();
+        r.onloadend = () => res(String(r.result || ''));
+        r.onerror = () => res('');
+        r.readAsDataURL(blob);
+      });
+      const text = dataUrl ? await apiService.transcribeAudio(dataUrl) : '';
+      holdResolveRef.current?.(text);
+    };
+
+    if (rec && rec.state !== 'inactive') {
+      rec.onstop = () => { finish(); };
+      rec.stop();
+    } else {
+      finish();
+    }
+  }
+
+  // Shows the hold-to-talk button and resolves with what the visitor said
+  // (or '' if they never press it within the window).
+  function promptHoldToTalk(): Promise<string> {
+    return new Promise((resolve) => {
+      let done = false;
+      const settle = (text: string) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        holdResolveRef.current = null;
+        setListening(null);
+        resolve(text);
+      };
+      holdResolveRef.current = settle;
+      setListening('idle');
+      const timer = setTimeout(() => settle(''), 20000);
+    });
+  }
+
+  // Recording and speech input can't both hold the mic at once on this
+  // WebView - pause the segment for the listen window, then start a fresh
+  // one right after. Real browsers use the native Web Speech API; the
+  // kiosk uses press-and-hold-to-talk + server transcription.
   async function listenWithMicReleased(): Promise<string> {
     await stopRecordingSegment();
-    const said = await listenOnce(LISTEN_TIMEOUT_MS);
+    const said = hasNativeSpeechRecognition()
+      ? await listenOnce(LISTEN_TIMEOUT_MS)
+      : await promptHoldToTalk();
     await startRecordingSegment();
     return said;
   }
@@ -126,6 +235,9 @@ export function StandbyPage() {
   function finishVisit() {
     recognizingRef.current = false;
     setSubtitle(null);
+    setFaceBox(null);
+    setListening(null);
+    holdResolveRef.current = null;
     setPhase('dormant');
   }
 
@@ -133,7 +245,7 @@ export function StandbyPage() {
   // initial recognition window or mid-conversation with someone who
   // hadn't been matched yet (e.g. the resident walks up while the kiosk
   // is still talking to an earlier, unidentified visitor).
-  async function handleRecognized(result: NonNullable<RecognizeResult>) {
+  async function handleRecognized(result: RecognizedResident) {
     stopRecordingSegment(); // discard - recognized visits don't need a clip
 
     await apiService.createEvent({
@@ -270,11 +382,11 @@ export function StandbyPage() {
       if (videoRef.current) {
         try {
           const base64 = captureVideoFrameAsBase64(videoRef.current);
-          const match = await apiService.recognizeFace(base64);
-          if (match) {
+          const scan = await apiService.recognizeFace(base64);
+          if (scan?.resident) {
             interruptedByResidentRef.current = true;
             stopLiveFeed();
-            await handleRecognized(match);
+            await handleRecognized({ resident: scan.resident, isAdmin: scan.isAdmin });
             return;
           }
         } catch {
@@ -406,29 +518,48 @@ export function StandbyPage() {
 
     async function recognize() {
       const start = Date.now();
-      let result: RecognizeResult = null;
+      let matched: RecognizedResident | null = null;
+      let sawFace = false;
 
       while (Date.now() - start < RECOGNITION_WINDOW_MS && !cancelled) {
         try {
           const base64 = captureVideoFrameAsBase64(videoRef.current!);
-          result = await apiService.recognizeFace(base64);
-          if (result) break;
+          const scan = await apiService.recognizeFace(base64);
+          if (scan?.faceDetected) {
+            sawFace = true;
+            setFaceBox(scan.box);
+            if (scan.resident) {
+              matched = { resident: scan.resident, isAdmin: scan.isAdmin };
+              break;
+            }
+          } else {
+            setFaceBox(null);
+          }
         } catch {
-          // no face in this frame / transient error, keep trying until the window closes
+          // transient error - keep trying until the window closes
         }
         await new Promise((resolve) => setTimeout(resolve, RECOGNITION_ATTEMPT_INTERVAL_MS));
       }
 
       if (cancelled) return;
 
-      if (result) {
-        await handleRecognized(result);
+      if (matched) {
+        await handleRecognized(matched);
         return;
       }
 
-      // Nobody matched - keep recording through the conversation, decide
-      // what to upload once it's over.
-      setPhase('conversing');
+      if (sawFace) {
+        // A real person we don't recognise - talk to them / record a clip.
+        setPhase('conversing');
+        return;
+      }
+
+      // Motion but NO face for the whole window: a car went by, a shadow
+      // moved, the light changed. Not a visitor - go back to sleep quietly,
+      // no "não te reconheci", no street video saved.
+      setFaceBox(null);
+      stopRecordingSegment();
+      finishVisit();
     }
 
     recognize();
@@ -463,23 +594,43 @@ export function StandbyPage() {
       style={{ cursor: 'pointer' }}
       onClick={() => !welcomeName && navigate('/home')}
     >
-      <video
-        ref={videoRef}
-        muted
-        playsInline
+      <div
         style={
           phase === 'dormant'
             ? { display: 'none' }
-            : {
-                width: '100%',
-                maxWidth: '360px',
-                borderRadius: '16px',
-                marginBottom: '20px',
-                border: '3px solid var(--border)',
-                transform: 'scaleX(-1)', // mirror, like a real mirror/webcam
-              }
+            : { position: 'relative', width: '100%', maxWidth: '360px', marginBottom: '20px' }
         }
-      />
+      >
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          style={{
+            width: '100%',
+            display: 'block',
+            borderRadius: '16px',
+            border: '3px solid var(--border)',
+            transform: 'scaleX(-1)', // mirror, like a real mirror/webcam
+          }}
+        />
+        {faceBox && (
+          <div
+            style={{
+              position: 'absolute',
+              // preview is mirrored, so flip x
+              left: `${Math.max(0, (1 - faceBox.x - faceBox.width) * 100)}%`,
+              top: `${Math.max(0, faceBox.y * 100)}%`,
+              width: `${faceBox.width * 100}%`,
+              height: `${faceBox.height * 100}%`,
+              border: '3px solid #22c55e',
+              borderRadius: '8px',
+              boxShadow: '0 0 0 2px rgba(0,0,0,0.35)',
+              pointerEvents: 'none',
+              transition: 'all 0.15s linear',
+            }}
+          />
+        )}
+      </div>
 
       {welcomeName ? (
         <div style={{ textAlign: 'center' }}>
@@ -492,6 +643,44 @@ export function StandbyPage() {
           <div className="icon mb-24">🤖</div>
           <h1>Assistente virtual</h1>
           {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
+          {listening !== null && (
+            <button
+              onPointerDown={(e) => {
+                e.preventDefault();
+                startHoldRecording();
+              }}
+              onPointerUp={stopHoldRecording}
+              onPointerLeave={stopHoldRecording}
+              onPointerCancel={stopHoldRecording}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={listening === 'processing'}
+              style={{
+                marginTop: '16px',
+                width: '100%',
+                maxWidth: '360px',
+                padding: '22px',
+                fontSize: '20px',
+                fontWeight: 700,
+                borderRadius: '16px',
+                border: 'none',
+                color: 'white',
+                userSelect: 'none',
+                touchAction: 'none',
+                background:
+                  listening === 'recording'
+                    ? '#ef4444'
+                    : listening === 'processing'
+                    ? '#64748b'
+                    : '#2563eb',
+              }}
+            >
+              {listening === 'recording'
+                ? '🔴 Gravando... solte para enviar'
+                : listening === 'processing'
+                ? '⏳ Entendendo...'
+                : '🎤 Segure para falar'}
+            </button>
+          )}
         </div>
       ) : phase === 'active' ? (
         <div style={{ textAlign: 'center' }}>
