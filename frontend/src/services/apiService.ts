@@ -151,7 +151,7 @@ class ApiService {
   async ringResidentDevices(callerLabel: string): Promise<{ callId: string }> {
     return this.request('/push/ring', {
       method: 'POST',
-      body: JSON.stringify({ callerLabel }),
+      body: JSON.stringify({ callerLabel, doorbellId: kioskDoorbellId() }),
     });
   }
 

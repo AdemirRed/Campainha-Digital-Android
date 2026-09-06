@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import { PushSubscriptionRepository } from '../database/repositories/PushSubscriptionRepository';
 import { getVapidPublicKey, pushToAllDevices } from '../services/PushService';
-import { broadcastIncomingCall, getResidentsOnlineCount } from '../services/CallSignalingService';
+import { broadcastIncomingCall, callSignalingIdFor, getResidentsOnlineCount } from '../services/CallSignalingService';
 import { ApiResponse } from '@shared/types/api';
 
 export class PushController {
@@ -46,10 +46,12 @@ export class PushController {
   async ring(req: Request, res: Response): Promise<void> {
     try {
       const callerLabel = typeof req.body?.callerLabel === 'string' ? req.body.callerLabel : 'Campainha';
+      const doorbellId = Number(req.body?.doorbellId) || undefined;
       const callId = crypto.randomUUID();
+      const from = callSignalingIdFor(doorbellId);
 
-      broadcastIncomingCall(callId, callerLabel);
-      await pushToAllDevices({ type: 'incoming-call', callId, callerLabel });
+      broadcastIncomingCall(callId, callerLabel, doorbellId);
+      await pushToAllDevices({ type: 'incoming-call', callId, callerLabel, from });
 
       res.json({ success: true, data: { callId } } as ApiResponse);
     } catch (error: any) {

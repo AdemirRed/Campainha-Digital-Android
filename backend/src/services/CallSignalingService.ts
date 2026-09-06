@@ -92,8 +92,24 @@ function broadcastPresence(): void {
 // Broadcasts an incoming-call ring to every resident device currently
 // connected (open tab). Devices with the tab closed are reached
 // separately via Web Push, not this.
-export function broadcastIncomingCall(callId: string, callerLabel: string): void {
-  const payload = JSON.stringify({ type: 'incoming-call', callId, callerLabel, from: 'kiosk' });
+//
+// `from` must be the kiosk's real signaling deviceId ("kiosk:<doorbellId>")
+// so the resident's accept-call / call-answer / ICE go back to the socket
+// that's actually placing the call - otherwise the call sits on
+// "Conectando..." forever.
+export function callSignalingIdFor(doorbellId?: number): string {
+  const wanted = doorbellId ? `kiosk:${doorbellId}` : null;
+  if (wanted && devices.has(wanted)) return wanted;
+  // Fall back to whatever bare "kiosk:*" call socket is connected.
+  for (const d of devices.values()) {
+    if (d.deviceId === 'kiosk' || /^kiosk:\d+$/.test(d.deviceId)) return d.deviceId;
+  }
+  return wanted || 'kiosk';
+}
+
+export function broadcastIncomingCall(callId: string, callerLabel: string, doorbellId?: number): void {
+  const from = callSignalingIdFor(doorbellId);
+  const payload = JSON.stringify({ type: 'incoming-call', callId, callerLabel, from });
   for (const d of devices.values()) {
     if (d.role === 'resident' && d.ws.readyState === WebSocket.OPEN) {
       d.ws.send(payload);
