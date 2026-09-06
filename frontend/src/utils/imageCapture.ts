@@ -32,12 +32,13 @@ function applyBacklightCompensation(ctx: CanvasRenderingContext2D, w: number, h:
   const mean = n > 0 ? sum / n : 128;
 
   // Nothing to do once the centre is reasonably exposed.
-  if (mean >= 110) return;
+  if (mean >= 100) return;
 
-  // mean 110 -> gamma ~1 (no-op); mean 30 -> gamma ~0.45 (strong lift).
-  const strength = Math.min(1, (110 - mean) / 80);
-  const gamma = 1 - 0.55 * strength;
-  const gain = 1 + 0.25 * strength;
+  // mean ~100 -> gamma ~1 (no-op); very dark -> gamma ~0.62 (moderate lift).
+  // Kept gentle on purpose so it never washes the image out.
+  const strength = Math.min(1, (100 - mean) / 75);
+  const gamma = 1 - 0.38 * strength;
+  const gain = 1 + 0.08 * strength;
 
   const lut = new Uint8ClampedArray(256);
   for (let v = 0; v < 256; v++) {
@@ -62,35 +63,21 @@ export function captureVideoFrameAsBase64(video: HTMLVideoElement, quality = 0.8
   return canvas.toDataURL('image/jpeg', quality);
 }
 
-// Best-effort: ask the camera to keep auto-exposing (and nudge it a little
-// brighter) so a backlit face isn't left in the dark at the sensor level.
-// Support is very device-dependent; failures are silently ignored.
+// Best-effort: keep the camera on continuous AUTO exposure. We deliberately
+// do NOT force brightness/exposureCompensation - on some phones that blew
+// the whole frame to white. The real backlit-face fix is the software
+// shadow-lift in captureVideoFrameAsBase64 above, which only touches the
+// analysed frame, never the live sensor.
 export async function tuneCameraForBacklight(stream: MediaStream): Promise<void> {
   const track = stream.getVideoTracks()[0];
   if (!track || typeof track.getCapabilities !== 'function') return;
   try {
     const caps = track.getCapabilities() as any;
-    const constraints: any = {};
-    if (caps.exposureMode && caps.exposureMode.includes('continuous')) {
-      constraints.exposureMode = 'continuous';
-    }
-    if (caps.exposureCompensation) {
-      const { max, step } = caps.exposureCompensation;
-      if (typeof max === 'number') {
-        constraints.exposureCompensation = Math.min(max, (step || 0.5) * 4);
-      }
-    }
-    if (caps.brightness) {
-      const { max, min } = caps.brightness;
-      if (typeof max === 'number' && typeof min === 'number') {
-        constraints.brightness = min + (max - min) * 0.6;
-      }
-    }
-    if (Object.keys(constraints).length > 0) {
-      await track.applyConstraints({ advanced: [constraints] });
+    if (caps.exposureMode && Array.isArray(caps.exposureMode) && caps.exposureMode.includes('continuous')) {
+      await track.applyConstraints({ advanced: [{ exposureMode: 'continuous' } as any] });
     }
   } catch {
-    // camera doesn't expose these controls - the frame-level lift still applies
+    // camera doesn't expose these controls - nothing to do
   }
 }
 
