@@ -427,7 +427,7 @@ export function NotificationsPage() {
         </div>
         <video
           ref={liveView.videoRef}
-          autoPlay playsInline muted
+          autoPlay playsInline
           style={{ width: '100%', borderRadius: 12, background: '#000', marginBottom: 16, display: liveView.state === 'live' || liveView.state === 'connecting' ? 'block' : 'none' }}
         />
 

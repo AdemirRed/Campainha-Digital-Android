@@ -28,6 +28,7 @@ export function useLiveViewer(targetDoorbellId: number) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const clientRef = useRef<CallSignalingClient | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localAudioRef = useRef<MediaStream | null>(null);
   const watchIdRef = useRef<string>('');
   const timersRef = useRef<{ req?: ReturnType<typeof setTimeout>; ping?: ReturnType<typeof setInterval> }>({});
 
@@ -46,6 +47,8 @@ export function useLiveViewer(targetDoorbellId: number) {
     if (timersRef.current.ping) { clearInterval(timersRef.current.ping); timersRef.current.ping = undefined; }
     pcRef.current?.close();
     pcRef.current = null;
+    localAudioRef.current?.getTracks().forEach((t) => t.stop());
+    localAudioRef.current = null;
     client?.close();
     clientRef.current = null;
     watchIdRef.current = '';
@@ -76,6 +79,16 @@ export function useLiveViewer(targetDoorbellId: number) {
     dispatch({ type: 'start' });
     setErrorMsg(null);
 
+    // Grab the viewer's mic so they can talk back to whoever's at the door.
+    // Best-effort: if it fails, live view still works one-way (video only).
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((s) => {
+        if (watchIdRef.current === watchId) localAudioRef.current = s;
+        else s.getTracks().forEach((t) => t.stop());
+      })
+      .catch(() => {});
+
     client.on('watch-busy', (msg) => {
       if (msg.watchId !== watchId) return;
       // Tear the client down so a later start() from 'busy' is not a
@@ -105,6 +118,9 @@ export function useLiveViewer(targetDoorbellId: number) {
         if (pc.connectionState === 'connected') dispatch({ type: 'connected' });
         if (['failed', 'disconnected'].includes(pc.connectionState)) fail('Conexão perdida');
       };
+      // Send the viewer's voice to the doorbell (if the mic opened).
+      const mic = localAudioRef.current;
+      if (mic) mic.getAudioTracks().forEach((t) => pc.addTrack(t, mic));
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
         const answer = await pc.createAnswer();

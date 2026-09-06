@@ -12,7 +12,27 @@ interface WatchSession {
   from: string;
   pc: RTCPeerConnection;
   stream: MediaStream;
+  remoteAudio: HTMLAudioElement | null;
   idleTimer: ReturnType<typeof setTimeout>;
+}
+
+// video + mic, degrading gracefully - some phones can't open the mic and
+// we still want the one-way video peek to work.
+async function getWatchMedia(): Promise<MediaStream> {
+  const attempts: MediaStreamConstraints[] = [
+    { video: true, audio: true },
+    { video: true, audio: { echoCancellation: true, noiseSuppression: true } as MediaTrackConstraints },
+    { video: true, audio: false },
+  ];
+  let lastErr: unknown;
+  for (const c of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(c);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
 }
 
 export function useKioskLiveHost(enabled: boolean): void {
@@ -28,6 +48,10 @@ export function useKioskLiveHost(enabled: boolean): void {
       clearTimeout(session.idleTimer);
       session.pc.close();
       session.stream.getTracks().forEach((t) => t.stop());
+      if (session.remoteAudio) {
+        session.remoteAudio.pause();
+        session.remoteAudio.srcObject = null;
+      }
       session = null;
     }
 
@@ -64,7 +88,7 @@ export function useKioskLiveHost(enabled: boolean): void {
           let localStream: MediaStream | undefined;
           let localPc: RTCPeerConnection | undefined;
           try {
-            localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            localStream = await getWatchMedia();
             localPc = new RTCPeerConnection(ICE_SERVERS);
             const pc = localPc;
             const stream = localStream;
@@ -75,7 +99,16 @@ export function useKioskLiveHost(enabled: boolean): void {
             pc.onconnectionstatechange = () => {
               if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) teardown();
             };
-            session = { watchId, from, pc, stream, idleTimer: setTimeout(teardown, WATCH_IDLE_TIMEOUT_MS) };
+            // Play the viewer's voice through the doorbell speaker.
+            const remoteAudio = new Audio();
+            remoteAudio.autoplay = true;
+            pc.ontrack = (e) => {
+              if (e.track.kind === 'audio' && e.streams[0]) {
+                remoteAudio.srcObject = e.streams[0];
+                remoteAudio.play().catch(() => {});
+              }
+            };
+            session = { watchId, from, pc, stream, remoteAudio, idleTimer: setTimeout(teardown, WATCH_IDLE_TIMEOUT_MS) };
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             c.send({ type: 'watch-offer', to: from, watchId, sdp: offer });

@@ -34,11 +34,11 @@ export function AdminCameraTab({ showToast }: { showToast: (msg: string, type?: 
           : <button className="admin-btn admin-btn-danger" onClick={stop}>■ Parar</button>}
         <span style={{ fontSize: 14, color: '#64748b' }}>{label[state]}</span>
       </div>
+      {/* not muted: the doorbell's audio (two-way) comes through this element */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        muted
         style={{ width: '100%', maxWidth: 640, borderRadius: 12, background: '#000', display: state === 'live' || state === 'connecting' ? 'block' : 'none' }}
       />
       {state === 'error' && <p style={{ color: 'var(--error)' }}>{errorMsg}</p>}
