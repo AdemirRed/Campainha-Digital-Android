@@ -12,8 +12,16 @@ const execFileP = promisify(execFile);
 // WebView has no Web Speech API, so it records a short clip and posts it
 // here to be transcribed with whisper.cpp running on the host.
 const WHISPER_BIN = process.env.WHISPER_BIN || '/opt/whisper.cpp/build/bin/whisper-cli';
-const WHISPER_MODEL = process.env.WHISPER_MODEL || '/opt/whisper.cpp/models/ggml-base.bin';
+const WHISPER_MODEL = process.env.WHISPER_MODEL || '/opt/whisper.cpp/models/ggml-small.bin';
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
+
+// Domain hint - nudges whisper toward the vocabulary it'll actually hear
+// at a residential doorbell instead of generic transcription guesses.
+const WHISPER_PROMPT =
+  'Conversa na campainha de uma casa. O visitante pode ser entregador, ' +
+  'prestador de serviço, vizinho ou parente. Palavras comuns: entrega, ' +
+  'Mercado Livre, iFood, Correios, encomenda, recado, morador, portão, ' +
+  'assinatura, código.';
 
 function base64ToBuffer(b64: string): Buffer {
   const comma = b64.indexOf(',');
@@ -45,8 +53,8 @@ export async function transcribeAudio(audioBase64: string): Promise<string> {
     // Transcription text goes to stdout; progress/system info to stderr.
     const { stdout } = await execFileP(
       WHISPER_BIN,
-      ['-m', WHISPER_MODEL, '-f', wavPath, '-l', 'pt', '-nt', '-t', '4'],
-      { timeout: 60000, maxBuffer: 4 * 1024 * 1024 },
+      ['-m', WHISPER_MODEL, '-f', wavPath, '-l', 'pt', '-nt', '-t', '4', '--prompt', WHISPER_PROMPT],
+      { timeout: 90000, maxBuffer: 4 * 1024 * 1024 },
     );
 
     const text = stdout.replace(/\s+/g, ' ').trim();

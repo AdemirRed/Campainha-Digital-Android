@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { tuneCameraForBacklight } from '../utils/imageCapture';
 
 const CHECK_INTERVAL_MS = 700;
 // Averaged over the whole sampled frame, someone walking up from a
@@ -40,6 +41,9 @@ export function useMotionDetector(videoRef: React.RefObject<HTMLVideoElement>, e
           return;
         }
         streamRef.current = stream;
+        // Best-effort: keep the camera auto-exposing / nudge it brighter so
+        // a backlit face isn't crushed to black at the sensor.
+        tuneCameraForBacklight(stream).catch(() => {});
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
