@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/apiService';
 import { speak } from '../utils/speech';
-import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
+import { isSpeechRecognitionSupported } from '../utils/voiceRecognition';
+import { useHoldToTalk } from '../hooks/useHoldToTalk';
+import { HoldToTalkButton } from '../components/HoldToTalkButton';
 import { EventType } from '@shared/types/event';
 
-const LISTEN_TIMEOUT_MS = 10000;
 // Pure infinite-loop guard, not a UX limit - conversation length is
 // driven by silence/goodbye detection below, not a turn count.
 const MAX_TOTAL_TURNS = 20;
@@ -26,6 +27,7 @@ export function CallResidentPage() {
   const allChunksRef = useRef<Blob[]>([]);
   const [subtitle, setSubtitle] = useState('Chamando o assistente virtual...');
   const [done, setDone] = useState(false);
+  const { listening, listen, buttonHandlers } = useHoldToTalk();
 
   // Starts a fresh recording segment (its own audio track + the shared
   // video track), stopping any segment already in progress first.
@@ -107,11 +109,11 @@ export function CallResidentPage() {
 
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TOTAL_TURNS && !cancelled; turn++) {
-          // Recording and SpeechRecognition can't both hold the mic at
-          // once on this WebView - pause the segment for the listen
-          // window, then start a new one right after.
+          // Recording and voice input can't both hold the mic at once on
+          // this WebView - pause the segment for the listen window, then
+          // start a new one right after.
           await stopRecordingSegment();
-          const said = await listenOnce(LISTEN_TIMEOUT_MS);
+          const said = await listen(20000);
           await startRecordingSegment();
 
           if (!said.trim()) {
@@ -233,6 +235,8 @@ export function CallResidentPage() {
         <div className="icon mb-24">{done ? '✅' : '🤖'}</div>
         <h1 className="mb-24">{done ? 'Recado enviado!' : 'Assistente virtual'}</h1>
         <p style={{ fontSize: '18px' }}>{subtitle}</p>
+
+        <HoldToTalkButton listening={listening} handlers={buttonHandlers} />
 
         {!done && (
           <button className="btn btn-outline mt-32" onClick={() => navigate('/home')}>
