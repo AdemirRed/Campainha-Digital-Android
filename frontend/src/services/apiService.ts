@@ -434,6 +434,28 @@ class ApiService {
     });
   }
 
+  // How the kiosk records: '24_7' (rolling CCTV), 'person' (only clips of
+  // an actual visitor), or 'off'.
+  async getRecordingMode(): Promise<'24_7' | 'person' | 'off'> {
+    try {
+      const result = await this.request<{ value: string | null }>('/settings/recording_mode', {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      const v = result.value;
+      return v === '24_7' || v === 'off' ? v : 'person';
+    } catch {
+      return 'person';
+    }
+  }
+
+  async setRecordingMode(mode: '24_7' | 'person' | 'off'): Promise<void> {
+    await this.request(`/settings/recording_mode`, {
+      method: 'PUT',
+      body: JSON.stringify({ value: mode }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // Resident-recorded presence status (e.g. "saí, volto às 21h"), used by
   // the assistant to answer visitors asking if someone is home
   async getPresenceStatus(): Promise<{ text: string; updatedAt: string } | null> {

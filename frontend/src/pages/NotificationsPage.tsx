@@ -349,6 +349,15 @@ export function NotificationsPage() {
           >
             Ativar notificações
           </button>
+          <div>
+            <a
+              href="/admin/residents"
+              className="btn btn-outline"
+              style={{ display: 'inline-block', marginTop: 12, textDecoration: 'none' }}
+            >
+              ⚙️ Abrir painel admin
+            </a>
+          </div>
         </div>
       </div>
     );
@@ -402,6 +411,13 @@ export function NotificationsPage() {
           <div className="icon mb-24">🔔</div>
           <h1>Notificações ativas</h1>
           <p style={{ color: 'var(--success)' }}>Escutando... mantenha esta aba aberta</p>
+          <a
+            href="/admin/residents"
+            className="btn btn-outline"
+            style={{ display: 'inline-block', marginTop: 8, textDecoration: 'none' }}
+          >
+            ⚙️ Abrir painel admin
+          </a>
         </div>
 
         <div style={{ marginBottom: 16, textAlign: 'center' }}>

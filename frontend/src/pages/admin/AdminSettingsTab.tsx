@@ -36,6 +36,9 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
   const [instructions, setInstructions] = useState('');
   const [savingInstructions, setSavingInstructions] = useState(false);
 
+  const [recordingMode, setRecordingModeState] = useState<'24_7' | 'person' | 'off'>('person');
+  const [savingRecMode, setSavingRecMode] = useState(false);
+
   const [presenceStatus, setPresenceStatus] = useState<{ text: string; updatedAt: string } | null>(null);
   const [recordingPresence, setRecordingPresence] = useState(false);
 
@@ -49,7 +52,21 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
 
     apiService.getAssistantInstructions().then(setInstructions);
     apiService.getPresenceStatus().then(setPresenceStatus);
+    apiService.getRecordingMode().then(setRecordingModeState).catch(() => {});
   }, []);
+
+  async function handleChangeRecordingMode(mode: '24_7' | 'person' | 'off') {
+    setRecordingModeState(mode);
+    setSavingRecMode(true);
+    try {
+      await apiService.setRecordingMode(mode);
+      showToast('Modo de gravação salvo!');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao salvar', 'error');
+    } finally {
+      setSavingRecMode(false);
+    }
+  }
 
   async function handleRecordPresence() {
     if (!isSpeechRecognitionSupported()) {
@@ -114,6 +131,21 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
           </div>
         </div>
       )}
+
+      <h2 className="admin-section-title">Gravação</h2>
+      <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '12px', fontSize: '14px' }}>
+        Como a campainha grava vídeo.
+      </p>
+      <select
+        value={recordingMode}
+        onChange={(e) => handleChangeRecordingMode(e.target.value as '24_7' | 'person' | 'off')}
+        disabled={savingRecMode}
+        style={{ width: '100%', padding: '12px', fontSize: '15px', borderRadius: '8px', marginBottom: '24px' }}
+      >
+        <option value="24_7">24 horas por dia (gravação contínua)</option>
+        <option value="person">Só quando detecta uma pessoa</option>
+        <option value="off">Desligado (não grava vídeo)</option>
+      </select>
 
       <h2 className="admin-section-title">Instruções para o assistente</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>

@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { apiService } from '../services/apiService';
 
-const SEGMENT_MS = 5 * 60 * 1000; // 5-minute clips, like a rolling CCTV loop
+// Short segments so footage is actually saved on a phone kiosk that may
+// reload or navigate often - a 5-minute segment meant nothing ever
+// uploaded unless the standby screen stayed mounted a full 5 minutes.
+const SEGMENT_MS = 90 * 1000;
 
 // MediaRecorder's periodic ondataavailable chunks (via a timeslice) are
 // NOT independently playable - only the very first chunk contains the
@@ -88,7 +91,9 @@ export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElemen
       stoppedRef.current = true;
       if (segmentTimer) clearTimeout(segmentTimer);
       if (currentRecorder && currentRecorder.state !== 'inactive') {
-        currentRecorder.onstop = null; // don't upload a partial segment on teardown
+        // Keep the partial segment - on a phone kiosk that reloads often,
+        // dropping it meant footage was routinely lost. onstop still fires
+        // and uploads; stoppedRef stops it chaining a new segment.
         currentRecorder.stop();
       }
       currentAudioStream?.getTracks().forEach((t) => t.stop());

@@ -46,10 +46,21 @@ export function StandbyPage() {
   // pointless message/clip for someone who turned out to be a resident.
   const interruptedByResidentRef = useRef(false);
 
+  const [recordingMode, setRecordingMode] = useState<'24_7' | 'person' | 'off'>('person');
+  const recordingModeRef = useRef(recordingMode);
+  useEffect(() => {
+    recordingModeRef.current = recordingMode;
+  }, [recordingMode]);
+  useEffect(() => {
+    apiService.getRecordingMode().then(setRecordingMode).catch(() => {});
+    const t = setInterval(() => apiService.getRecordingMode().then(setRecordingMode).catch(() => {}), 60000);
+    return () => clearInterval(t);
+  }, []);
+
   const { motionDetected, cameraError } = useMotionDetector(videoRef, true);
-  // Pause the rolling background recording while the visitor is holding
-  // the talk button - this phone's mic can't be opened twice at once.
-  useContinuousRecording(videoRef, !cameraError && listening === null);
+  // 24/7 rolling recording only in that mode. Pause it while the visitor
+  // holds the talk button - this phone's mic can't be opened twice at once.
+  useContinuousRecording(videoRef, recordingMode === '24_7' && !cameraError && listening === null);
 
   // converseWithVisitor() runs inside an async loop and needs the latest
   // motion reading at each step, not the value from when it started -
@@ -79,6 +90,7 @@ export function StandbyPage() {
   // building a separate audio-only stream and combining it with just the
   // video track into a new MediaStream, purely for the recorder.
   async function startRecordingSegment() {
+    if (recordingModeRef.current === 'off') return; // recording disabled by the resident
     const videoTrack = (videoRef.current?.srcObject as MediaStream | undefined)?.getVideoTracks()[0];
     if (!videoTrack || typeof MediaRecorder === 'undefined') return;
 
