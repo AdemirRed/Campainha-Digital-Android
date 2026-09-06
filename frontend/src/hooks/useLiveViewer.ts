@@ -81,13 +81,19 @@ export function useLiveViewer(targetDoorbellId: number) {
 
     // Grab the viewer's mic so they can talk back to whoever's at the door.
     // Best-effort: if it fails, live view still works one-way (video only).
-    navigator.mediaDevices
+    // Kept as a promise so the offer handler can await it and add the
+    // track BEFORE createAnswer (otherwise the viewer is never heard).
+    const micPromise = navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((s) => {
-        if (watchIdRef.current === watchId) localAudioRef.current = s;
-        else s.getTracks().forEach((t) => t.stop());
+        if (watchIdRef.current === watchId) {
+          localAudioRef.current = s;
+          return s;
+        }
+        s.getTracks().forEach((t) => t.stop());
+        return null;
       })
-      .catch(() => {});
+      .catch(() => null);
 
     client.on('watch-busy', (msg) => {
       if (msg.watchId !== watchId) return;
@@ -118,8 +124,10 @@ export function useLiveViewer(targetDoorbellId: number) {
         if (pc.connectionState === 'connected') dispatch({ type: 'connected' });
         if (['failed', 'disconnected'].includes(pc.connectionState)) fail('Conexão perdida');
       };
-      // Send the viewer's voice to the doorbell (if the mic opened).
-      const mic = localAudioRef.current;
+      // Send the viewer's voice to the doorbell. Wait for the mic (it
+      // resolves async and the offer can beat it), then add the track
+      // before createAnswer so it's in the SDP.
+      const mic = localAudioRef.current || (await micPromise);
       if (mic) mic.getAudioTracks().forEach((t) => pc.addTrack(t, mic));
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));

@@ -93,6 +93,11 @@ export function useKioskLiveHost(enabled: boolean): void {
             const pc = localPc;
             const stream = localStream;
             stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+            // If the doorbell mic didn't open, still advertise an audio
+            // m-line so the viewer's voice has somewhere to land.
+            if (stream.getAudioTracks().length === 0) {
+              pc.addTransceiver('audio', { direction: 'recvonly' });
+            }
             pc.onicecandidate = (e) => {
               if (e.candidate) c.send({ type: 'watch-ice', to: from, watchId, candidate: e.candidate });
             };
