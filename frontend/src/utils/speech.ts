@@ -19,9 +19,29 @@ function speakViaAndroidBridge(text: string): Promise<void> {
 
   const utteranceId = `tts-${nextUtteranceId++}`;
 
+  // Some Android TTS engines / devices never fire the "done" callback
+  // (missing pt-BR voice data, OEM quirks). Without a fallback the caller
+  // awaits forever and the conversation freezes right after the greeting -
+  // no reply prompt, no button. Resolve after an estimate of how long the
+  // phrase takes to say, whichever comes first.
+  const maxWaitMs = Math.min(15000, Math.max(2500, text.length * 75 + 1200));
+
   return new Promise((resolve) => {
-    window.__ttsResolvers![utteranceId] = resolve;
-    window.AndroidTTS!.speak(text, utteranceId);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (window.__ttsResolvers) delete window.__ttsResolvers[utteranceId];
+      resolve();
+    };
+    const timer = setTimeout(finish, maxWaitMs);
+    window.__ttsResolvers![utteranceId] = finish;
+    try {
+      window.AndroidTTS!.speak(text, utteranceId);
+    } catch {
+      finish();
+    }
   });
 }
 
@@ -48,11 +68,21 @@ export function speak(text: string): Promise<void> {
   window.speechSynthesis.cancel(); // don't queue up overlapping phrases
 
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve();
+    };
+    // speechSynthesis can also silently stall on some browsers - same
+    // safety net as the Android bridge.
+    const timer = setTimeout(finish, Math.min(15000, Math.max(2500, text.length * 75 + 1200)));
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'pt-BR';
     utterance.rate = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    utterance.onend = finish;
+    utterance.onerror = finish;
     window.speechSynthesis.speak(utterance);
   });
 }
