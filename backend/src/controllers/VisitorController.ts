@@ -112,6 +112,34 @@ export class VisitorController {
     } as ApiResponse);
   };
 
+  deleteVisit = (req: Request, res: Response): void => {
+    const visitId = parseId(req.params.id);
+    if (visitId === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }
+    const repo = new VisitsRepository();
+    const visit = repo.findById(visitId);
+    if (visit?.photo_path) {
+      try {
+        const photosPath = process.env.PHOTOS_PATH || './data/storage/photos';
+        const p = path.join(photosPath, visit.photo_path);
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      } catch { /* best-effort */ }
+    }
+    repo.delete(visitId);
+    res.json({ success: true, data: null } as ApiResponse);
+  };
+
+  clearVisits = (_req: Request, res: Response): void => {
+    new VisitsRepository().deleteAll();
+    res.json({ success: true, data: null } as ApiResponse);
+  };
+
+  remove = (req: Request, res: Response): void => {
+    const id = parseId(req.params.id);
+    if (id === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }
+    new VisitorRepository().delete(id);
+    res.json({ success: true, data: null } as ApiResponse);
+  };
+
   nameVisit = (req: Request, res: Response): void => {
     const visitId = parseId(req.params.id);
     if (visitId === null) { res.status(400).json({ success: false, error: 'ID inválido' } as ApiResponse); return; }

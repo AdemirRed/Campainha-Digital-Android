@@ -25,6 +25,8 @@ const PING_INTERVAL_MS = 20_000;
 export function useLiveViewer(targetDoorbellId: number) {
   const [state, setState] = useState<LiveViewerState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [micMuted, setMicMuted] = useState(false);
+  const [speakerMuted, setSpeakerMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const clientRef = useRef<CallSignalingClient | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -156,7 +158,30 @@ export function useLiveViewer(targetDoorbellId: number) {
     }, REQUEST_TIMEOUT_MS);
   }, [dispatch, targetDoorbellId, fail, teardown]);
 
-  useEffect(() => () => stop(), [stop]);
+  const toggleMic = useCallback(() => {
+    setMicMuted((prev) => {
+      const next = !prev;
+      localAudioRef.current?.getAudioTracks().forEach((t) => (t.enabled = !next));
+      return next;
+    });
+  }, []);
 
-  return { state, start, stop, videoRef, errorMsg };
+  const toggleSpeaker = useCallback(() => {
+    setSpeakerMuted((prev) => {
+      const next = !prev;
+      if (videoRef.current) videoRef.current.muted = next;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => () => stop(), [stop]);
+  // reset mute flags whenever a fresh session starts
+  useEffect(() => {
+    if (state === 'requesting') {
+      setMicMuted(false);
+      setSpeakerMuted(false);
+    }
+  }, [state]);
+
+  return { state, start, stop, videoRef, errorMsg, micMuted, speakerMuted, toggleMic, toggleSpeaker };
 }

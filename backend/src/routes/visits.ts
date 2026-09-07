@@ -7,5 +7,7 @@ export function createVisitsRouter(): Router {
   const c = new VisitorController();
   router.get('/', auth, c.timeline);
   router.post('/:id/name', auth, c.nameVisit);
+  router.delete('/all', auth, c.clearVisits);
+  router.delete('/:id', auth, c.deleteVisit);
   return router;
 }

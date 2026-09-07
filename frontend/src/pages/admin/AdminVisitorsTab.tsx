@@ -65,6 +65,17 @@ function PeopleView({ showToast }: { showToast: (m: string, t?: 'success' | 'err
     catch { setVisits([]); }
   }
 
+  async function removeVisitor(id: number) {
+    if (!window.confirm('Remover este visitante? As visitas dele continuam na linha do tempo.')) return;
+    try {
+      await apiService.deleteVisitor(id);
+      setRows((prev) => prev.filter((r) => r.id !== id));
+      showToast('Visitante removido');
+    } catch (e: any) {
+      showToast(e.message || 'Erro ao remover', 'error');
+    }
+  }
+
   const isUnknown = (name: string) => !name || name.toLowerCase().startsWith('desconhecido');
 
   if (loading) return <p>Carregando...</p>;
@@ -89,9 +100,14 @@ function PeopleView({ showToast }: { showToast: (m: string, t?: 'success' | 'err
           <div style={{ fontSize: 12, color: '#64748b', marginTop: 6 }}>
             {v.visit_count} visita(s) · última {new Date(v.last_seen_at).toLocaleString('pt-BR')}
           </div>
-          <button className="admin-btn" style={{ marginTop: 8 }} onClick={() => toggle(v.id)}>
-            {expanded === v.id ? 'Ocultar visitas' : 'Ver visitas'}
-          </button>
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button className="admin-btn" style={{ flex: 1 }} onClick={() => toggle(v.id)}>
+              {expanded === v.id ? 'Ocultar visitas' : 'Ver visitas'}
+            </button>
+            <button className="admin-btn admin-btn-danger" onClick={() => removeVisitor(v.id)} title="Remover visitante">
+              🗑️
+            </button>
+          </div>
           {expanded === v.id && (
             <div style={{ marginTop: 8 }}>
               {visits.length === 0 && <p style={{ fontSize: 13 }}>Sem visitas registradas.</p>}
@@ -144,6 +160,29 @@ function TimelineView({ showToast }: { showToast: (m: string, t?: 'success' | 'e
     }
   }
 
+  async function removeOne(visitId: number) {
+    if (!window.confirm('Remover esta visita?')) return;
+    try {
+      await apiService.deleteVisit(visitId);
+      setItems((prev) => prev.filter((x) => x.id !== visitId));
+      setTotal((t) => Math.max(0, t - 1));
+    } catch (e: any) {
+      showToast(e.message || 'Erro ao remover', 'error');
+    }
+  }
+
+  async function clearAll() {
+    if (!window.confirm('Apagar TODAS as visitas registradas? Não dá para desfazer.')) return;
+    try {
+      await apiService.clearVisits();
+      setItems([]);
+      setTotal(0);
+      showToast('Tudo apagado');
+    } catch (e: any) {
+      showToast(e.message || 'Erro ao apagar', 'error');
+    }
+  }
+
   const isUnknown = (v: Visit) => !v.visitor_id && (!v.name_snapshot || v.name_snapshot.toLowerCase().startsWith('desconhecido'));
 
   if (loading && items.length === 0) return <p>Carregando...</p>;
@@ -151,6 +190,9 @@ function TimelineView({ showToast }: { showToast: (m: string, t?: 'success' | 'e
 
   return (
     <div>
+      <button className="admin-btn admin-btn-danger" onClick={clearAll} style={{ marginBottom: 12 }}>
+        🗑️ Apagar todas
+      </button>
       {items.map((v) => (
         <div key={v.id} className="admin-card" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
           {v.photo_path
@@ -174,6 +216,14 @@ function TimelineView({ showToast }: { showToast: (m: string, t?: 'success' | 'e
               <div style={{ fontWeight: 600 }}>{v.name_snapshot || 'Visitante'}</div>
             )}
           </div>
+          <button
+            className="admin-btn admin-btn-danger"
+            onClick={() => removeOne(v.id)}
+            title="Remover"
+            style={{ flexShrink: 0 }}
+          >
+            🗑️
+          </button>
         </div>
       ))}
       {items.length < total && (

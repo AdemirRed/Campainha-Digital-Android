@@ -6,7 +6,8 @@ import type { Doorbell } from '@shared/types/doorbell';
 export function AdminCameraTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const [doorbells, setDoorbells] = useState<Doorbell[]>([]);
   const [selected, setSelected] = useState<number>(1);
-  const { state, start, stop, videoRef, errorMsg } = useLiveViewer(selected);
+  const { state, start, stop, videoRef, errorMsg, micMuted, speakerMuted, toggleMic, toggleSpeaker } =
+    useLiveViewer(selected);
 
   useEffect(() => {
     apiService.getDoorbells().then((list) => {
@@ -32,6 +33,16 @@ export function AdminCameraTab({ showToast }: { showToast: (msg: string, type?: 
         {state === 'idle' || state === 'error' || state === 'busy'
           ? <button className="admin-btn" onClick={start}>▶ Ver ao vivo</button>
           : <button className="admin-btn admin-btn-danger" onClick={stop}>■ Parar</button>}
+        {(state === 'live' || state === 'connecting') && (
+          <>
+            <button className="admin-btn" onClick={toggleMic}>
+              {micMuted ? '🔇 Meu mic (mudo)' : '🎤 Meu mic'}
+            </button>
+            <button className="admin-btn" onClick={toggleSpeaker}>
+              {speakerMuted ? '🔇 Som da porta (mudo)' : '🔊 Som da porta'}
+            </button>
+          </>
+        )}
         <span style={{ fontSize: 14, color: '#64748b' }}>{label[state]}</span>
       </div>
       {/* not muted: the doorbell's audio (two-way) comes through this element */}

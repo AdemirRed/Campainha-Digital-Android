@@ -8,6 +8,7 @@ export function createVisitorRouter(): Router {
   router.get('/', auth, c.list);
   router.post('/unrecognized', c.recordUnrecognized.bind(c));
   router.patch('/:id', auth, c.rename);
+  router.delete('/:id', auth, c.remove);
   router.get('/:id/visits', auth, c.listVisits);
   return router;
 }

@@ -358,6 +358,27 @@ class ApiService {
     });
   }
 
+  async deleteVisit(visitId: number): Promise<void> {
+    await this.request(`/visits/${visitId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
+  async clearVisits(): Promise<void> {
+    await this.request(`/visits/all`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
+  async deleteVisitor(id: number): Promise<void> {
+    await this.request(`/visitors/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // AI assistant (Ollama Cloud) - talks to unrecognized visitors and
   // summarizes recent activity for recognized residents
   async chatWithAssistant(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string> {

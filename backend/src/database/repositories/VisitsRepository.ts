@@ -55,6 +55,16 @@ export class VisitsRepository {
 
   // Sets only the display name of a visit, without linking a visitor -
   // used when baptizing a visit that carries no usable face descriptor.
+  delete(id: number): void {
+    this.db.run('DELETE FROM visits WHERE id = ?', [id]);
+    Database.getInstance().save();
+  }
+
+  deleteAll(): void {
+    this.db.run('DELETE FROM visits');
+    Database.getInstance().save();
+  }
+
   setName(visitId: number, name: string): void {
     this.db.run('UPDATE visits SET name_snapshot = ? WHERE id = ?', [name, visitId]);
     Database.getInstance().save();

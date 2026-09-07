@@ -438,6 +438,16 @@ export function NotificationsPage() {
           {liveView.state === 'idle' || liveView.state === 'error' || liveView.state === 'busy'
             ? <button className="btn btn-outline" onClick={liveView.start}>📷 Ver câmera ao vivo</button>
             : <button className="btn btn-outline" onClick={liveView.stop}>■ Parar câmera</button>}
+          {(liveView.state === 'live' || liveView.state === 'connecting') && (
+            <span style={{ display: 'inline-flex', gap: 8, marginLeft: 8 }}>
+              <button className="btn btn-outline" onClick={liveView.toggleMic}>
+                {liveView.micMuted ? '🔇 Meu mic' : '🎤 Meu mic'}
+              </button>
+              <button className="btn btn-outline" onClick={liveView.toggleSpeaker}>
+                {liveView.speakerMuted ? '🔇 Som' : '🔊 Som'}
+              </button>
+            </span>
+          )}
           {liveView.state === 'busy' && <p style={{ color: 'var(--text-gray)' }}>Campainha ocupada em uma chamada</p>}
           {liveView.state === 'error' && <p style={{ color: 'var(--error)' }}>{liveView.errorMsg}</p>}
         </div>
