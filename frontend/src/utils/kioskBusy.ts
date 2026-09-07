@@ -18,3 +18,21 @@ export function onCallActiveChange(cb: (active: boolean) => void): () => void {
   listeners.add(cb);
   return () => listeners.delete(cb);
 }
+
+// Someone is watching the kiosk camera live (with two-way audio). Used so
+// the standby sound-wake doesn't hijack a live-view peek.
+let liveActive = false;
+
+export function setLiveActive(active: boolean): void {
+  liveActive = active;
+}
+
+export function isLiveActive(): boolean {
+  return liveActive;
+}
+
+// True if the kiosk is busy with anything that the standby assistant must
+// not interrupt.
+export function isKioskBusy(): boolean {
+  return callActive || liveActive;
+}

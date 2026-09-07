@@ -8,6 +8,8 @@ import { speak } from '../utils/speech';
 import { listenOnce, isSpeechRecognitionSupported } from '../utils/voiceRecognition';
 import { useHoldToTalk } from '../hooks/useHoldToTalk';
 import { HoldToTalkButton } from '../components/HoldToTalkButton';
+import { useSoundWake } from '../hooks/useSoundWake';
+import { isKioskBusy } from '../utils/kioskBusy';
 import { EventType } from '@shared/types/event';
 
 type Phase = 'dormant' | 'active' | 'conversing';
@@ -47,9 +49,15 @@ export function StandbyPage() {
   useEffect(() => {
     recordingModeRef.current = recordingMode;
   }, [recordingMode]);
+  const [soundWakeOn, setSoundWakeOn] = useState(false);
+  const pendingFirstUtteranceRef = useRef<string | null>(null);
   useEffect(() => {
-    apiService.getRecordingMode().then(setRecordingMode).catch(() => {});
-    const t = setInterval(() => apiService.getRecordingMode().then(setRecordingMode).catch(() => {}), 60000);
+    const refresh = () => {
+      apiService.getRecordingMode().then(setRecordingMode).catch(() => {});
+      apiService.getSoundWake().then(setSoundWakeOn).catch(() => {});
+    };
+    refresh();
+    const t = setInterval(refresh, 60000);
     return () => clearInterval(t);
   }, []);
 
@@ -60,6 +68,19 @@ export function StandbyPage() {
     videoRef,
     recordingMode === '24_7' && !cameraError && holdState !== 'recording',
   );
+
+  // Standby "activation by sound": a clap or a voice at the door wakes the
+  // assistant. Only while asleep, only when the mic is free (not 24/7),
+  // and it never barges into a call / live-view / ongoing conversation.
+  useSoundWake({
+    enabled: phase === 'dormant' && soundWakeOn && recordingMode !== '24_7' && !cameraError,
+    onWake: (firstUtterance) => {
+      if (recognizingRef.current || isKioskBusy()) return;
+      pendingFirstUtteranceRef.current = firstUtterance;
+      recognizingRef.current = true;
+      setPhase('conversing');
+    },
+  });
 
   // converseWithVisitor() runs inside an async loop and needs the latest
   // motion reading at each step, not the value from when it started -
@@ -215,6 +236,10 @@ export function StandbyPage() {
   // resident shows up mid-conversation.
   async function converseWithVisitor() {
     interruptedByResidentRef.current = false;
+    // If the assistant was woken by a sound, this is what the visitor
+    // already said - answer it directly instead of the generic greeting.
+    const firstUtterance = pendingFirstUtteranceRef.current;
+    pendingFirstUtteranceRef.current = null;
     const transcript: { role: 'user' | 'assistant'; content: string }[] = [];
 
     // Check if this face belongs to someone who's visited before (e.g. a
@@ -231,6 +256,8 @@ export function StandbyPage() {
 
     const opening = knownVisitor
       ? `Olá de novo, ${knownVisitor.name}!${knownVisitor.notes ? ` Da última vez: ${knownVisitor.notes}.` : ''} Como posso ajudar?`
+      : firstUtterance
+      ? 'Oi!'
       : 'Olá! Não te reconheci. Em que posso ajudar?';
     transcript.push({ role: 'assistant', content: opening });
     setSubtitle(opening);
@@ -256,7 +283,11 @@ export function StandbyPage() {
       if (knownVisitor) apiService.stopLive().catch(() => {});
     };
 
-    await speak(opening); // must finish talking before listening, or the mic hears itself
+    // When sound-woken we skip speaking the greeting - the reply to what
+    // they already said comes right after, below.
+    if (!firstUtterance) {
+      await speak(opening); // must finish talking before listening, or the mic hears itself
+    }
 
     if (!isSpeechRecognitionSupported()) {
       // No mic input available on this browser/device - still leave a
@@ -282,10 +313,30 @@ export function StandbyPage() {
     // the conversation. Any real answer resets this.
     let warnedSilence = false;
 
+    // Answer the utterance that woke the assistant, as a first turn.
+    if (firstUtterance && firstUtterance.trim()) {
+      const said = firstUtterance.trim();
+      qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
+      transcript.push({ role: 'user', content: said });
+      setSubtitle(`Visitante: ${said}`);
+      realTurns++;
+      if (FAREWELL_PATTERN.test(said)) saidGoodbye = true;
+      try {
+        const reply = await apiService.chatWithAssistant(transcript);
+        transcript.push({ role: 'assistant', content: reply });
+        lastAssistantLine = reply;
+        setSubtitle(reply);
+        await speak(reply);
+      } catch {
+        await speak('Desculpe, tive um problema para responder agora. Vou registrar sua visita.');
+        endedWithError = true;
+      }
+    }
+
     // Conversation length is driven by silence/goodbye detection, not a
     // turn count - MAX_TOTAL_TURNS is only a safety net against a truly
     // runaway loop.
-    while (realTurns < MAX_TOTAL_TURNS) {
+    while (!saidGoodbye && !endedWithError && realTurns < MAX_TOTAL_TURNS) {
       // Piggyback a face-recognition attempt on every turn: if a resident
       // walks up while we're still chatting with an unidentified visitor,
       // switch straight to the welcome flow instead of recording a

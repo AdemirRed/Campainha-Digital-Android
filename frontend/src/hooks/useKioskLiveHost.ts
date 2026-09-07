@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { CallSignalingClient } from '../utils/callSignaling';
 import { ICE_SERVERS } from '../utils/webrtcConfig';
-import { isCallActive, onCallActiveChange as onCallActiveChangeSafe } from '../utils/kioskBusy';
+import { isCallActive, onCallActiveChange as onCallActiveChangeSafe, setLiveActive } from '../utils/kioskBusy';
 import { apiService } from '../services/apiService';
 import { getDoorbellId } from '../utils/doorbell';
 
@@ -53,6 +53,7 @@ export function useKioskLiveHost(enabled: boolean): void {
         session.remoteAudio.srcObject = null;
       }
       session = null;
+      setLiveActive(false);
     }
 
     function armIdleTimer() {
@@ -114,6 +115,7 @@ export function useKioskLiveHost(enabled: boolean): void {
               }
             };
             session = { watchId, from, pc, stream, remoteAudio, idleTimer: setTimeout(teardown, WATCH_IDLE_TIMEOUT_MS) };
+            setLiveActive(true);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             c.send({ type: 'watch-offer', to: from, watchId, sdp: offer });

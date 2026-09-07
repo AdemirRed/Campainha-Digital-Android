@@ -39,6 +39,9 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
   const [recordingMode, setRecordingModeState] = useState<'24_7' | 'person' | 'off'>('person');
   const [savingRecMode, setSavingRecMode] = useState(false);
 
+  const [soundWake, setSoundWakeState] = useState(false);
+  const [savingSoundWake, setSavingSoundWake] = useState(false);
+
   const [presenceStatus, setPresenceStatus] = useState<{ text: string; updatedAt: string } | null>(null);
   const [recordingPresence, setRecordingPresence] = useState(false);
 
@@ -53,6 +56,7 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
     apiService.getAssistantInstructions().then(setInstructions);
     apiService.getPresenceStatus().then(setPresenceStatus);
     apiService.getRecordingMode().then(setRecordingModeState).catch(() => {});
+    apiService.getSoundWake().then(setSoundWakeState).catch(() => {});
   }, []);
 
   async function handleChangeRecordingMode(mode: '24_7' | 'person' | 'off') {
@@ -65,6 +69,19 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
       showToast(err.message || 'Erro ao salvar', 'error');
     } finally {
       setSavingRecMode(false);
+    }
+  }
+
+  async function handleToggleSoundWake(on: boolean) {
+    setSoundWakeState(on);
+    setSavingSoundWake(true);
+    try {
+      await apiService.setSoundWake(on);
+      showToast('Configuração salva!');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao salvar', 'error');
+    } finally {
+      setSavingSoundWake(false);
     }
   }
 
@@ -146,6 +163,24 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
         <option value="person">Só quando detecta uma pessoa</option>
         <option value="off">Desligado (não grava vídeo)</option>
       </select>
+
+      <h2 className="admin-section-title">Ativação por som</h2>
+      <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '6px' }}>
+        <input
+          type="checkbox"
+          checked={soundWake}
+          disabled={savingSoundWake}
+          onChange={(e) => handleToggleSoundWake(e.target.checked)}
+          style={{ marginTop: '3px' }}
+        />
+        <span style={{ fontSize: '15px' }}>
+          Ativar o assistente ao ouvir som (palmas, alguém falando) no modo de espera.
+        </span>
+      </label>
+      <p style={{ color: '#64748b', marginTop: '0', marginBottom: '24px', fontSize: '13px' }}>
+        Só funciona com a gravação em <strong>"Só quando detecta uma pessoa"</strong> (no modo 24h o
+        microfone fica ocupado). Não interrompe uma chamada ou uma conversa já em andamento.
+      </p>
 
       <h2 className="admin-section-title">Instruções para o assistente</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '16px', fontSize: '14px' }}>

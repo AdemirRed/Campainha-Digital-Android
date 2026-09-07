@@ -479,6 +479,26 @@ class ApiService {
     });
   }
 
+  // Wake the assistant when the kiosk hears a clap / a voice in standby.
+  async getSoundWake(): Promise<boolean> {
+    try {
+      const result = await this.request<{ value: string | null }>('/settings/standby_sound_activation', {
+        headers: { Authorization: `Bearer ${API_TOKEN}` },
+      });
+      return result.value === 'on';
+    } catch {
+      return false;
+    }
+  }
+
+  async setSoundWake(on: boolean): Promise<void> {
+    await this.request(`/settings/standby_sound_activation`, {
+      method: 'PUT',
+      body: JSON.stringify({ value: on ? 'on' : 'off' }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
   // Resident-recorded presence status (e.g. "saí, volto às 21h"), used by
   // the assistant to answer visitors asking if someone is home
   async getPresenceStatus(): Promise<{ text: string; updatedAt: string } | null> {
