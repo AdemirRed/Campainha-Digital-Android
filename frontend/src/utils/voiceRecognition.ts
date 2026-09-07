@@ -36,10 +36,15 @@ export function isSpeechRecognitionSupported(): boolean {
   return getSpeechRecognitionCtor() !== null || canRecordAudio();
 }
 
-// True only when the browser has the real Web Speech API (Chrome/Android
-// Chrome). In the kiosk WebView this is false, so the assistant uses a
+// True only when the browser has a WORKING Web Speech API (real Chrome /
+// Android Chrome). The kiosk WebView exposes window.webkitSpeechRecognition
+// too, but it's non-functional there (no speech service) - so when the
+// native TTS bridge is present (i.e. we're inside the app) we force the
 // press-and-hold-to-talk button + server transcription instead.
 export function hasNativeSpeechRecognition(): boolean {
+  if (typeof window !== 'undefined' && (window as unknown as { AndroidTTS?: unknown }).AndroidTTS) {
+    return false;
+  }
   return getSpeechRecognitionCtor() !== null;
 }
 
@@ -115,7 +120,9 @@ function listenViaServer(ms: number): Promise<string> {
  * callers should treat "" as "visitor didn't say anything usable".
  */
 export function listenOnce(timeoutMs = 8000): Promise<string> {
-  const Ctor = getSpeechRecognitionCtor();
+  // In the kiosk WebView the native API is present but broken - fall
+  // straight through to recording + server transcription.
+  const Ctor = hasNativeSpeechRecognition() ? getSpeechRecognitionCtor() : null;
   if (!Ctor) {
     return canRecordAudio() ? listenViaServer(timeoutMs) : Promise.resolve('');
   }
