@@ -118,6 +118,16 @@ body {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.btn-danger {
+  background: transparent;
+  color: #f87171;
+  border: 3px solid #f87171;
+}
+
+.btn-danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
 /* Icon styles */
 .icon {
   font-size: 48px;

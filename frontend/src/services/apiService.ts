@@ -541,6 +541,16 @@ class ApiService {
       headers: { Authorization: `Bearer ${API_TOKEN}` },
     });
   }
+
+  // Clear the presence status - the assistant goes back to "não tenho
+  // certeza" when a visitor asks if someone's home.
+  async clearPresenceStatus(): Promise<void> {
+    await this.request(`/settings/presence_status`, {
+      method: 'PUT',
+      body: JSON.stringify({ value: '' }),
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
 }
 
 export const apiService = new ApiService();

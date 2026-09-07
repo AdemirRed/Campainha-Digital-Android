@@ -85,6 +85,17 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
     }
   }
 
+  async function handleClearPresence() {
+    if (!window.confirm('Remover o status de presença?')) return;
+    try {
+      await apiService.clearPresenceStatus();
+      setPresenceStatus(null);
+      showToast('Status removido');
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao remover status', 'error');
+    }
+  }
+
   async function handleRecordPresence() {
     if (!isSpeechRecognitionSupported()) {
       showToast('Reconhecimento de voz não disponível neste dispositivo', 'error');
@@ -233,10 +244,15 @@ export function AdminSettingsTab({ showToast }: { showToast: (msg: string, type?
           </div>
         </div>
       )}
-      <div className="grid grid-1" style={{ marginBottom: '24px' }}>
+      <div className="grid grid-1" style={{ marginBottom: '24px', gap: '8px' }}>
         <Button variant="outline" onClick={handleRecordPresence} disabled={recordingPresence}>
           {recordingPresence ? '🎙️ Ouvindo...' : '🎙️ Gravar status de presença'}
         </Button>
+        {presenceStatus && (
+          <Button variant="danger" onClick={handleClearPresence} disabled={recordingPresence}>
+            🗑️ Remover status
+          </Button>
+        )}
       </div>
 
       <h2 className="admin-section-title">Notificações</h2>
