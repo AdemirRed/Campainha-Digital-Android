@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
-import { hasNativeSpeechRecognition, listenOnce } from '../utils/voiceRecognition';
+import { canRecordAudio } from '../utils/voiceRecognition';
 
 export type HoldState = 'idle' | 'recording' | 'processing';
 
@@ -116,12 +116,11 @@ export function useHoldToTalk() {
     }
   }, [setS, deliver]);
 
-  // One utterance. Native speech when available; otherwise the (already
-  // buffered) hold-to-talk result, or waits up to `timeoutMs` for one.
+  // One utterance via press-and-hold-to-talk on every platform (the native
+  // Web Speech API is too flaky - broken in the kiosk WebView, permission/
+  // network dependent on desktop). Returns a buffered result if the visitor
+  // pressed the button early, otherwise waits up to `timeoutMs` for one.
   const listen = useCallback((timeoutMs = 25000): Promise<string> => {
-    if (hasNativeSpeechRecognition()) {
-      return listenOnce(Math.min(timeoutMs, 10000));
-    }
     if (bufferRef.current !== null) {
       const t = bufferRef.current;
       bufferRef.current = null;
@@ -158,10 +157,10 @@ export function useHoldToTalk() {
 
   useEffect(() => () => cancel(), [cancel]);
 
-  // Show the button whenever there's no native speech recognition (i.e. in
-  // the kiosk WebView). The caller decides *when* to render it (during the
-  // assistant conversation).
-  const showButton = !hasNativeSpeechRecognition();
+  // Always show the button when this device can record audio - it's the
+  // one input method that works everywhere. The caller decides *when* to
+  // render it (during the assistant conversation).
+  const showButton = canRecordAudio();
 
   const buttonHandlers = {
     onPointerDown: (e: React.PointerEvent) => {

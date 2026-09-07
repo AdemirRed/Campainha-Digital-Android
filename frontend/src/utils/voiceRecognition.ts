@@ -21,7 +21,7 @@ function getSpeechRecognitionCtor(): (new () => MinimalSpeechRecognition) | null
   return (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 }
 
-function canRecordAudio(): boolean {
+export function canRecordAudio(): boolean {
   return (
     typeof MediaRecorder !== 'undefined' &&
     typeof navigator !== 'undefined' &&
