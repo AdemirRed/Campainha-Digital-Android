@@ -21,6 +21,7 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
+        android:name=".KioskApp"
         android:allowBackup="true"
         android:label="Campainha Kiosk"
         android:icon="@mipmap/ic_launcher"

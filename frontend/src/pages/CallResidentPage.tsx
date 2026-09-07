@@ -27,7 +27,7 @@ export function CallResidentPage() {
   const allChunksRef = useRef<Blob[]>([]);
   const [subtitle, setSubtitle] = useState('Chamando o assistente virtual...');
   const [done, setDone] = useState(false);
-  const { listening, listen, buttonHandlers } = useHoldToTalk();
+  const { state: holdState, showButton, listen, buttonHandlers } = useHoldToTalk();
 
   // Starts a fresh recording segment (its own audio track + the shared
   // video track), stopping any segment already in progress first.
@@ -236,7 +236,7 @@ export function CallResidentPage() {
         <h1 className="mb-24">{done ? 'Recado enviado!' : 'Assistente virtual'}</h1>
         <p style={{ fontSize: '18px' }}>{subtitle}</p>
 
-        <HoldToTalkButton listening={listening} handlers={buttonHandlers} />
+        {!done && <HoldToTalkButton show={showButton} state={holdState} handlers={buttonHandlers} />}
 
         {!done && (
           <button className="btn btn-outline mt-32" onClick={() => navigate('/home')}>
