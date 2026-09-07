@@ -9,10 +9,11 @@ import Button from '../components/Button';
 import Loading from '../components/Loading';
 import Toast from '../components/Toast';
 
-// Not every carrier gives out a tracking code at drop-off (e.g. Correios
-// or an unlisted courier just hands over the package) - only require one
-// where it realistically applies.
-const CODE_REQUIRED_COMPANIES = new Set(['mercadolivre', 'shopee', 'amazon']);
+// Almost no carrier hands the courier a code to type at drop-off - the
+// Mercado Livre label has none, Correios/avulso just hand over the box.
+// So the code field is always optional here; it stays only as a place to
+// jot a tracking number if the courier happens to have one.
+const CODE_REQUIRED_COMPANIES = new Set<string>([]);
 const LIVE_PUSH_INTERVAL_MS = 1500;
 
 export function DeliveryCodePage() {
