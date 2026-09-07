@@ -58,11 +58,8 @@ const DELIVERY_COMPANY_LABELS: Record<string, string> = {
   amazon: 'Amazon',
 };
 
-// Feeds the resident's per-company delivery instructions into the
-// conversation. The stored `code` field is free text on purpose: some
-// couriers ask for a confirmation number (iFood), but Mercado Livre
-// labels have none - there it might be the courier's name, a pass
-// phrase, or just an instruction ("pode deixar na portaria").
+// Feeds the resident's pre-registered delivery confirmation codes (the
+// number iFood / Mercado Livre couriers ask for) into the conversation.
 function buildDeliveryCodesInstruction(raw: string | null): string {
   if (!raw) return '';
   let codes: { company?: string; code?: string; note?: string }[];
@@ -77,17 +74,15 @@ function buildDeliveryCodesInstruction(raw: string | null): string {
     .filter((c) => c && c.company && c.code)
     .map((c) => {
       const label = DELIVERY_COMPANY_LABELS[c.company as string] || c.company;
-      return `- ${label}: ${c.code}${c.note ? ` (${c.note})` : ''}`;
+      return `- ${label}: código ${c.code}${c.note ? ` (${c.note})` : ''}`;
     });
   if (lines.length === 0) return '';
 
-  return `O morador deixou orientações de entrega por empresa:
+  return `O morador deixou códigos de confirmação de entrega cadastrados:
 ${lines.join('\n')}
-Se o visitante disser que é entregador de uma dessas empresas, use a orientação correspondente
-com naturalidade. Ela pode ser um código de confirmação ("o código é X, pode confirmar aí"),
-o nome do entregador esperado, uma frase de conferência, ou uma instrução do que fazer com a
-entrega ("pode deixar na portaria"). Interprete conforme o caso. Não invente código nem
-orientação para empresas que não estão na lista - nesse caso, ofereça registrar um recado.`;
+Se o visitante disser que é entregador de uma dessas empresas e pedir/precisar do código de
+confirmação, passe o código correspondente com naturalidade ("o código é X, pode confirmar aí").
+Não invente código para empresas que não estão na lista - nesse caso, ofereça registrar um recado.`;
 }
 
 function buildPresenceInstruction(presenceRaw: string | null): string {

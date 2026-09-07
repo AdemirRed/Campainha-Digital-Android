@@ -54,7 +54,7 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
     const company = newCompany === 'other' ? newOtherCompany.trim() : newCompany;
     const code = newCode.trim();
     if (!company || !code) {
-      showToast('Informe a empresa e o que o assistente deve responder', 'error');
+      showToast('Informe a empresa e o código', 'error');
       return;
     }
     const entry: DeliveryCode = {
@@ -68,12 +68,12 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
     setNewCode('');
     setNewNote('');
     setNewOtherCompany('');
-    showToast('Orientação cadastrada');
+    showToast('Código cadastrado');
   }
 
   async function handleRemoveCode(id: string) {
     await persistCodes(codes.filter((c) => c.id !== id));
-    showToast('Orientação removida');
+    showToast('Código removido');
   }
 
   async function handleDelete(delivery: Delivery) {
@@ -92,12 +92,10 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
 
   return (
     <div>
-      <h2 className="admin-section-title">Recebimento de entregas</h2>
+      <h2 className="admin-section-title">Códigos de recebimento</h2>
       <p style={{ color: '#64748b', marginTop: '-8px', marginBottom: '14px', fontSize: '14px' }}>
-        Para cada empresa, diga o que o assistente deve responder ao entregador. Pode ser um
-        código de confirmação (iFood), o nome do entregador, uma frase de conferência ou uma
-        instrução ("pode deixar na portaria") — no Mercado Livre normalmente não tem código.
-        Vale para todos os modos do assistente.
+        Cadastre aqui o código que o entregador vai pedir (iFood, Mercado Livre, etc). Quando alguém
+        chegar dizendo que é dessa empresa, o assistente informa o código.
       </p>
 
       <div className="admin-card" style={{ marginBottom: '16px' }}>
@@ -125,10 +123,10 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
             />
           )}
           <input
-            placeholder="Código, nome do entregador ou instrução"
+            placeholder="Código"
             value={newCode}
             onChange={(e) => setNewCode(e.target.value)}
-            style={{ padding: '10px', fontSize: '15px', flex: '2 1 200px' }}
+            style={{ padding: '10px', fontSize: '15px', flex: '1 1 110px' }}
           />
           <input
             placeholder="Observação (opcional)"
@@ -143,7 +141,7 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
       </div>
 
       {codes.length === 0 ? (
-        <div className="admin-empty" style={{ marginBottom: '32px' }}>Nenhuma orientação cadastrada.</div>
+        <div className="admin-empty" style={{ marginBottom: '32px' }}>Nenhum código cadastrado.</div>
       ) : (
         <div style={{ marginBottom: '32px' }}>
           {codes.map((c) => (
@@ -154,7 +152,7 @@ export function AdminDeliveriesTab({ showToast }: { showToast: (msg: string, typ
             >
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{companyLabel(c.company)}</div>
-                <div style={{ fontSize: '16px' }}>{c.code}</div>
+                <div style={{ fontSize: '20px', letterSpacing: '2px' }}>{c.code}</div>
                 {c.note && <div style={{ fontSize: '13px', color: '#94a3b8' }}>{c.note}</div>}
               </div>
               <button className="admin-btn admin-btn-danger" onClick={() => handleRemoveCode(c.id)}>
