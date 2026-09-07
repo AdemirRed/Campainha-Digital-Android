@@ -161,7 +161,7 @@ export function StandbyPage() {
   // kiosk uses press-and-hold-to-talk + server transcription (via the hook).
   async function listenWithMicReleased(): Promise<string> {
     await stopRecordingSegment();
-    const said = await holdListen(25000);
+    const said = await holdListen(30000);
     await startRecordingSegment();
     return said;
   }
@@ -308,10 +308,12 @@ export function StandbyPage() {
     let leftSilently = false;
     let endedWithError = false;
     let saidGoodbye = false;
-    // On the first silent turn, warn instead of ending right away - only
-    // a second silent turn in a row (after the warning) actually ends
-    // the conversation. Any real answer resets this.
-    let warnedSilence = false;
+    // Silent turns don't end the conversation immediately: the visitor
+    // may still be reaching for the "segure para falar" button. We give
+    // two quiet windows (~30s each) plus a spoken warning before wrapping
+    // up. Any real answer resets the counter. (If motion has also
+    // stopped, we end right away - they really left.)
+    let silentStrikes = 0;
 
     // Answer the utterance that woke the assistant, as a first turn.
     if (firstUtterance && firstUtterance.trim()) {
@@ -363,18 +365,21 @@ export function StandbyPage() {
           leftSilently = true;
           break; // they've actually left
         }
-        if (!warnedSilence) {
-          warnedSilence = true;
-          const warn = 'Ainda está aí? Vou encerrar em instantes se não ouvir uma resposta.';
+        silentStrikes++;
+        if (silentStrikes === 1) {
+          continue; // first quiet window - just wait again, no warning
+        }
+        if (silentStrikes === 2) {
+          const warn = 'Se precisar de mais alguma coisa, é só segurar o botão pra falar. Senão, encerro em instantes.';
           setSubtitle(warn);
           await speak(warn);
-          continue; // give one more chance after the warning
+          continue; // one last chance after the warning
         }
-        leftSilently = true; // silent again right after the warning
+        leftSilently = true; // still silent after the warning
         break;
       }
 
-      warnedSilence = false; // they responded - reset the silence strike
+      silentStrikes = 0; // they responded - reset the silence strikes
       realTurns++;
       qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
       transcript.push({ role: 'user', content: said });

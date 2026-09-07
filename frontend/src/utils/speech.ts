@@ -1,8 +1,35 @@
 declare global {
   interface Window {
-    AndroidTTS?: { speak: (text: string, utteranceId: string) => void };
+    AndroidTTS?: { speak: (text: string, utteranceId: string) => void; stop?: () => void };
     __ttsDone?: (utteranceId: string) => void;
     __ttsResolvers?: Record<string, () => void>;
+  }
+}
+
+// Shut the assistant up right now (visitor pressed "falar"). Cancels the
+// Android engine (if the bridge supports it) and browser speechSynthesis,
+// and resolves any pending speak() promise so the flow moves on.
+export function stopSpeaking(): void {
+  try {
+    window.AndroidTTS?.stop?.();
+  } catch {
+    /* older APK without stop() - the estimate timeout still frees the flow */
+  }
+  try {
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  } catch {
+    /* ignore */
+  }
+  const resolvers = window.__ttsResolvers;
+  if (resolvers) {
+    for (const id of Object.keys(resolvers)) {
+      try {
+        resolvers[id]?.();
+      } catch {
+        /* ignore */
+      }
+      delete resolvers[id];
+    }
   }
 }
 

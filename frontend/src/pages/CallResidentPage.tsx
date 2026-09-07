@@ -102,10 +102,11 @@ export function CallResidentPage() {
       let endedWithError = false;
       let leftSilently = false;
       let saidGoodbye = false;
-      // On the first silent turn, warn instead of ending right away -
-      // only a second silent turn in a row (after the warning) ends the
-      // conversation. Any real answer resets this.
-      let warnedSilence = false;
+      // Silent turns don't end the conversation immediately: the visitor
+      // may still be reaching for the "segure para falar" button. We give
+      // two quiet windows (~30s each) plus a spoken warning before
+      // wrapping up. Any real answer resets the counter.
+      let silentStrikes = 0;
 
       if (isSpeechRecognitionSupported()) {
         for (let turn = 0; turn < MAX_TOTAL_TURNS && !cancelled; turn++) {
@@ -113,22 +114,25 @@ export function CallResidentPage() {
           // this WebView - pause the segment for the listen window, then
           // start a new one right after.
           await stopRecordingSegment();
-          const said = await listen(20000);
+          const said = await listen(30000);
           await startRecordingSegment();
 
           if (!said.trim()) {
-            if (!warnedSilence) {
-              warnedSilence = true;
-              const warn = 'Ainda está aí? Vou encerrar em instantes se não ouvir uma resposta.';
+            silentStrikes++;
+            if (silentStrikes === 1) {
+              continue; // first quiet window - just wait again, no warning
+            }
+            if (silentStrikes === 2) {
+              const warn = 'Se precisar de mais alguma coisa, é só segurar o botão pra falar. Senão, encerro em instantes.';
               setSubtitle(warn);
               if (!cancelled) await speak(warn);
-              continue; // give one more chance after the warning
+              continue; // one last chance after the warning
             }
             leftSilently = true;
             break;
           }
 
-          warnedSilence = false; // they responded - reset the silence strike
+          silentStrikes = 0; // they responded - reset the silence strikes
           qaPairs.push(`Assistente: ${lastAssistantLine}\nVisitante: ${said}`);
           transcript.push({ role: 'user', content: said });
           setSubtitle(`Você: ${said}`);

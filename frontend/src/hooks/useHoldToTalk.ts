@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiService } from '../services/apiService';
 import { canRecordAudio } from '../utils/voiceRecognition';
+import { stopSpeaking } from '../utils/speech';
 
 export type HoldState = 'idle' | 'recording' | 'processing';
 
@@ -60,7 +61,11 @@ export function useHoldToTalk() {
       const w = waiterRef.current;
       waiterRef.current = null;
       w(text);
-    } else {
+    } else if (text.trim()) {
+      // Only buffer a real transcript. An empty result (accidental tap,
+      // Whisper heard nothing) must NOT be buffered - the next listen()
+      // would consume it instantly and the loop would treat it as
+      // silence, firing the "vou encerrar" warning ~2s after the reply.
       bufferRef.current = text;
     }
   }, []);
@@ -165,6 +170,9 @@ export function useHoldToTalk() {
   const buttonHandlers = {
     onPointerDown: (e: React.PointerEvent) => {
       e.preventDefault();
+      // Cut the assistant off the instant the visitor wants to talk -
+      // otherwise they're talking over the TTS and the mic catches both.
+      stopSpeaking();
       startRecording();
     },
     onPointerUp: () => stopRecording(),
