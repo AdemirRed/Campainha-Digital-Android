@@ -32,13 +32,15 @@ function applyBacklightCompensation(ctx: CanvasRenderingContext2D, w: number, h:
   const mean = n > 0 ? sum / n : 128;
 
   // Nothing to do once the centre is reasonably exposed.
-  if (mean >= 100) return;
+  if (mean >= 110) return;
 
-  // mean ~100 -> gamma ~1 (no-op); very dark -> gamma ~0.62 (moderate lift).
-  // Kept gentle on purpose so it never washes the image out.
-  const strength = Math.min(1, (100 - mean) / 75);
-  const gamma = 1 - 0.38 * strength;
-  const gain = 1 + 0.08 * strength;
+  // mean ~110 -> gamma ~1 (no-op); very dark (night) -> gamma ~0.5 plus a
+  // bigger gain, to claw back a usable face from an almost-black frame.
+  // There's a hard floor: if the sensor gave near-zero light there's
+  // nothing to lift, but this recovers dim indoor / dusk scenes.
+  const strength = Math.min(1, (110 - mean) / 95);
+  const gamma = 1 - 0.5 * strength;
+  const gain = 1 + 0.18 * strength;
 
   const lut = new Uint8ClampedArray(256);
   for (let v = 0; v < 256; v++) {

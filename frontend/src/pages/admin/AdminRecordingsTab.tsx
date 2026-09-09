@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiService, STORAGE_BASE_URL } from '../../services/apiService';
+import { apiService } from '../../services/apiService';
 
 interface Recording {
   filename: string;
@@ -11,6 +11,67 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Only fetches the actual video when the poster is clicked. The poster
+// image itself is lazy (loads when scrolled into view), so opening a day
+// with 300+ clips no longer fires hundreds of requests at once.
+function RecordingPlayer({ filename }: { filename: string }) {
+  const [playing, setPlaying] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
+
+  if (playing) {
+    return (
+      <video
+        controls
+        autoPlay
+        preload="auto"
+        src={apiService.continuousRecordingUrl(filename)}
+        style={{ width: '100%', borderRadius: 8, background: '#000' }}
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPlaying(true)}
+      title="Carregar e reproduzir"
+      style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '4 / 3',
+        border: 'none',
+        borderRadius: 8,
+        padding: 0,
+        overflow: 'hidden',
+        background: '#000',
+        cursor: 'pointer',
+      }}
+    >
+      {!thumbFailed && (
+        <img
+          src={apiService.continuousRecordingThumbUrl(filename)}
+          loading="lazy"
+          alt=""
+          onError={() => setThumbFailed(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      )}
+      <span
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'grid',
+          placeItems: 'center',
+          fontSize: 40,
+          color: 'rgba(255,255,255,0.92)',
+          textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+        }}
+      >
+        ▶
+      </span>
+    </button>
+  );
 }
 
 export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
@@ -96,7 +157,7 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
                   <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
                     {new Date(rec.createdAt).toLocaleTimeString('pt-BR')} · {formatBytes(rec.size)}
                   </div>
-                  <video controls src={`${STORAGE_BASE_URL}/storage/continuous/${rec.filename}`} />
+                  <RecordingPlayer filename={rec.filename} />
                   <button
                     className="admin-btn admin-btn-danger"
                     onClick={() => handleDelete(rec.filename)}

@@ -434,6 +434,16 @@ class ApiService {
     await this.request<void>(`/recordings/${encodeURIComponent(filename)}`, { method: 'DELETE' });
   }
 
+  continuousRecordingUrl(filename: string): string {
+    return `${STORAGE_BASE_URL}/storage/continuous/${encodeURIComponent(filename)}`;
+  }
+
+  // Cached JPEG poster - lets the recordings tab show a preview without
+  // downloading every clip.
+  continuousRecordingThumbUrl(filename: string): string {
+    return `${API_BASE_URL}/recordings/${encodeURIComponent(filename)}/thumb`;
+  }
+
   // Standing instructions the resident leaves for the AI assistant to
   // follow in every conversation (e.g. delivery codes, where to leave packages)
   async getAssistantInstructions(): Promise<string> {
