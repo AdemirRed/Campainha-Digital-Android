@@ -98,7 +98,13 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
   const byDay = useMemo(() => {
     const groups: Record<string, Recording[]> = {};
     for (const rec of recordings) {
-      const day = rec.createdAt.slice(0, 10);
+      // Group by LOCAL calendar day. createdAt is UTC ISO - slicing the
+      // string gave the UTC day, which put late-evening clips on the next
+      // day and, worse, made the label render one day early once
+      // localised (new Date("2026-09-09") is UTC midnight -> "08/09" in
+      // BRT). Build the key from the local date parts instead.
+      const d = new Date(rec.createdAt);
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       (groups[day] ||= []).push(rec);
     }
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
@@ -145,7 +151,7 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
               cursor: 'pointer',
             }}
           >
-            {new Date(day).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })}
+            {new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })}
             {' — '}
             {dayRecordings.length} clipe(s) {expandedDay === day ? '▲' : '▼'}
           </button>
