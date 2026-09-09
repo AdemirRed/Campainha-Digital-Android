@@ -16,6 +16,16 @@ const faceapi = require('@vladmandic/face-api/dist/face-api.node-wasm.js');
 const MODELS_PATH = path.join(__dirname, '../../../../models');
 const MATCH_THRESHOLD = 0.6;
 
+// A visitor stands right at the door, so their face fills a good chunk of
+// the frame. Anything much smaller is something far away being mistaken
+// for a face - a bench across the street, a pattern on a wall, a parked
+// car's headrest. Ignore those so the assistant doesn't start chatting
+// with the scenery.
+const MIN_FACE_FRAC = 0.14;
+// Raised from 0.3: the tiny detector is trigger-happy at 0.3 and paints
+// faces onto street furniture.
+const DETECTOR_SCORE_THRESHOLD = 0.5;
+
 let modelsReadyPromise: Promise<void> | null = null;
 
 function ensureModelsLoaded(): Promise<void> {
@@ -66,7 +76,10 @@ export async function analyzeFace(base64Image: string): Promise<FaceAnalysis> {
   const image = await loadImage(buffer);
 
   const detection = await faceapi
-    .detectSingleFace(image, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
+    .detectSingleFace(
+      image,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: DETECTOR_SCORE_THRESHOLD })
+    )
     .withFaceLandmarks()
     .withFaceDescriptor();
 
@@ -75,6 +88,13 @@ export async function analyzeFace(base64Image: string): Promise<FaceAnalysis> {
   }
 
   const b = detection.detection.box;
+  const widthFrac = b.width / image.width;
+  const heightFrac = b.height / image.height;
+  if (widthFrac < MIN_FACE_FRAC && heightFrac < MIN_FACE_FRAC) {
+    // Too far away to be someone at the door.
+    return { faceDetected: false, box: null, descriptor: null };
+  }
+
   return {
     faceDetected: true,
     box: {

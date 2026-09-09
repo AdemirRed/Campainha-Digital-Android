@@ -487,19 +487,25 @@ export function StandbyPage() {
       const start = Date.now();
       let matched: RecognizedResident | null = null;
       let sawFace = false;
+      // A lone frame with a "face" is almost always a false positive
+      // (scenery, a shadow, a passing reflection). Only treat it as a real
+      // visitor once we've seen a face on two scans in a row.
+      let faceStreak = 0;
 
       while (Date.now() - start < RECOGNITION_WINDOW_MS && !cancelled) {
         try {
           const base64 = captureVideoFrameAsBase64(videoRef.current!);
           const scan = await apiService.recognizeFace(base64);
           if (scan?.faceDetected) {
-            sawFace = true;
+            faceStreak++;
             setFaceBox(scan.box);
+            if (faceStreak >= 2) sawFace = true;
             if (scan.resident) {
               matched = { resident: scan.resident, isAdmin: scan.isAdmin };
               break;
             }
           } else {
+            faceStreak = 0;
             setFaceBox(null);
           }
         } catch {
