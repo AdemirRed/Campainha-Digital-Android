@@ -56,6 +56,9 @@ function applyBacklightCompensation(ctx: CanvasRenderingContext2D, w: number, h:
 }
 
 export function captureVideoFrameAsBase64(video: HTMLVideoElement, quality = 0.85): string {
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) {
+    throw new Error('Camera frame is not ready');
+  }
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;

@@ -58,6 +58,21 @@ function deleteOlderThanRetention(): void {
 }
 
 export class RecordingController {
+  async uploadBinary(req: Request, res: Response): Promise<void> {
+    try {
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).json({ success: false, error: 'video/webm body is required' } as ApiResponse);
+        return;
+      }
+      const filename = `${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+      fs.writeFileSync(path.join(continuousPath(), filename), req.body);
+      deleteOlderThanRetention();
+      res.status(201).json({ success: true, data: { filename } } as ApiResponse);
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message } as ApiResponse);
+    }
+  }
+
   async upload(req: Request, res: Response): Promise<void> {
     try {
       const { videoBase64 } = req.body;

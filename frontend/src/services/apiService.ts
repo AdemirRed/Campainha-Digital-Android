@@ -419,10 +419,11 @@ class ApiService {
   }
 
   // 24/7 rolling recording (7-day retention, oldest chunks auto-deleted)
-  async uploadContinuousChunk(videoBase64: string): Promise<{ filename: string }> {
-    return this.request('/recordings', {
+  async uploadContinuousChunk(video: Blob): Promise<{ filename: string }> {
+    return this.request('/recordings/binary', {
       method: 'POST',
-      body: JSON.stringify({ videoBase64 }),
+      headers: { 'Content-Type': 'video/webm' },
+      body: video,
     });
   }
 

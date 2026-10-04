@@ -39,6 +39,7 @@ export function StandbyPage() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recordingAudioStreamRef = useRef<MediaStream | null>(null);
   const allChunksRef = useRef<Blob[]>([]);
+  const visitorPhotoRef = useRef<string | null>(null);
   // Set once a recognized resident interrupts an ongoing stranger
   // conversation, so that flow can bail out cleanly instead of saving a
   // pointless message/clip for someone who turned out to be a resident.
@@ -464,7 +465,7 @@ export function StandbyPage() {
     if (videoBase64) {
       let stillBase64: string | undefined;
       try {
-        if (videoRef.current) stillBase64 = captureVideoFrameAsBase64(videoRef.current);
+        stillBase64 = visitorPhotoRef.current || (videoRef.current ? captureVideoFrameAsBase64(videoRef.current) : undefined);
       } catch {
         // sem frame - segue sem foto
       }
@@ -473,6 +474,7 @@ export function StandbyPage() {
       });
     }
     allChunksRef.current = [];
+    visitorPhotoRef.current = null;
   }
 
   useEffect(() => {
@@ -481,6 +483,7 @@ export function StandbyPage() {
     recognizingRef.current = true;
     let cancelled = false;
     allChunksRef.current = [];
+    visitorPhotoRef.current = null;
     startRecordingSegment();
 
     async function recognize() {
@@ -499,7 +502,10 @@ export function StandbyPage() {
           if (scan?.faceDetected) {
             faceStreak++;
             setFaceBox(scan.box);
-            if (faceStreak >= 2) sawFace = true;
+            if (faceStreak >= 2) {
+              sawFace = true;
+              if (!visitorPhotoRef.current) visitorPhotoRef.current = base64;
+            }
             if (scan.resident) {
               matched = { resident: scan.resident, isAdmin: scan.isAdmin };
               break;

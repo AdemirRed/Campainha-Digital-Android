@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { EventRepository } from '../database/repositories/EventRepository';
 import { VisitsRepository } from '../database/repositories/VisitsRepository';
 import { VisitorRepository } from '../database/repositories/VisitorRepository';
@@ -14,6 +16,14 @@ function base64ToBuffer(base64: string): Buffer {
   const data = commaIndex >= 0 ? base64.slice(commaIndex + 1) : base64;
   return Buffer.from(data, 'base64');
 }
+
+function isImageBuffer(data: Buffer): boolean {
+  return (data.length > 8 && data[0] === 0xff && data[1] === 0xd8) ||
+    (data.length > 8 && data[0] === 0x89 && data.subarray(1, 4).toString() === 'PNG');
+}
+
+const execFileP = promisify(execFile);
+const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
 
 export class VisitorController {
   private eventRepo: EventRepository;
@@ -41,10 +51,25 @@ export class VisitorController {
       fs.writeFileSync(path.join(videosPath, videoFile), base64ToBuffer(videoBase64));
 
       let photoFile: string | null = null;
+      const photosPath = process.env.PHOTOS_PATH || './data/storage/photos';
       if (photoBase64 && typeof photoBase64 === 'string') {
-        const photosPath = process.env.PHOTOS_PATH || './data/storage/photos';
-        photoFile = `visit-${Date.now()}-${crypto.randomUUID()}.jpg`;
-        fs.writeFileSync(path.join(photosPath, photoFile), base64ToBuffer(photoBase64));
+        const photo = base64ToBuffer(photoBase64);
+        if (isImageBuffer(photo)) {
+          photoFile = `visit-${Date.now()}-${crypto.randomUUID()}.jpg`;
+          fs.writeFileSync(path.join(photosPath, photoFile), photo);
+        }
+      }
+      if (!photoFile) {
+        // CallResidentPage and older kiosk clients may submit only video.
+        // Extract a still so every saved visit can appear in the timeline.
+        const generated = `visit-${Date.now()}-${crypto.randomUUID()}.jpg`;
+        const target = path.join(photosPath, generated);
+        try {
+          await execFileP(FFMPEG_BIN, ['-y', '-ss', '2', '-i', path.join(videosPath, videoFile), '-frames:v', '1', '-q:v', '3', target], { timeout: 15000 });
+          if (fs.existsSync(target) && fs.statSync(target).size > 1000) photoFile = generated;
+        } catch {
+          // Video remains saved even if this host cannot make a poster.
+        }
       }
 
       const dbCandidate = Number(doorbellId);

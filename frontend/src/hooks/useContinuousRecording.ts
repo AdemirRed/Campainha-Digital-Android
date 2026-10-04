@@ -1,102 +1,107 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { apiService } from '../services/apiService';
 
-// Short segments so footage is actually saved on a phone kiosk that may
-// reload or navigate often - a 5-minute segment meant nothing ever
-// uploaded unless the standby screen stayed mounted a full 5 minutes.
-const SEGMENT_MS = 90 * 1000;
+// Each stop creates a standalone WebM. Periodic data events belong to the
+// same file; joining them retains its header and makes the segment playable.
+const SEGMENT_MS = 90_000;
+const TIMESLICE_MS = 5_000;
+const MAX_SEGMENT_BYTES = 10 * 1024 * 1024;
 
-// MediaRecorder's periodic ondataavailable chunks (via a timeslice) are
-// NOT independently playable - only the very first chunk contains the
-// WebM header. To get standalone segments that each play back on their
-// own, we stop and restart a fresh recorder every SEGMENT_MS instead of
-// slicing a single long recording.
 export function useContinuousRecording(videoRef: React.RefObject<HTMLVideoElement>, enabled: boolean) {
-  const stoppedRef = useRef(false);
-
   useEffect(() => {
     if (!enabled) return;
-    stoppedRef.current = false;
 
+    let cancelled = false;
     let currentRecorder: MediaRecorder | null = null;
     let currentAudioStream: MediaStream | null = null;
     let segmentTimer: ReturnType<typeof setTimeout> | null = null;
 
-    function uploadSegment(chunks: Blob[]) {
-      if (chunks.length === 0) return;
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const reader = new FileReader();
-      reader.onload = () => {
-        apiService.uploadContinuousChunk(reader.result as string).catch(() => {
-          // best-effort - a dropped segment shouldn't stop the loop
-        });
-      };
-      reader.readAsDataURL(blob);
+    async function uploadSegment(blob: Blob) {
+      if (blob.size === 0) return;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          await apiService.uploadContinuousChunk(blob);
+          return;
+        } catch (error) {
+          if (attempt === 3) {
+            console.error('Falha ao enviar gravação 24h após 3 tentativas', error);
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
+        }
+      }
     }
 
     async function recordSegment() {
-      if (stoppedRef.current) return;
-
-      // The display stream (bound to <video>) stays video-only and is
-      // only ever read here, never mutated - adding/removing tracks on a
-      // stream that's actively shown corrupts the preview on this
-      // WebView. Sound comes from a separate audio-only stream, combined
-      // with just the video track into a new MediaStream for the
-      // recorder to use.
+      if (cancelled) return;
       const displayStream = videoRef.current?.srcObject as MediaStream | undefined;
       const videoTrack = displayStream?.getVideoTracks()[0];
-      if (!videoTrack || typeof MediaRecorder === 'undefined') {
-        // Camera not ready yet - try again shortly instead of giving up.
-        segmentTimer = setTimeout(recordSegment, 2000);
+      if (!videoTrack || videoTrack.readyState !== 'live' || typeof MediaRecorder === 'undefined') {
+        segmentTimer = setTimeout(recordSegment, 2_000);
         return;
       }
 
       const chunks: Blob[] = [];
-      let recorder: MediaRecorder;
+      let bytes = 0;
+      let audioStream: MediaStream | null = null;
       try {
-        let combined: MediaStream = new MediaStream([videoTrack]);
+        let combined = new MediaStream([videoTrack]);
         try {
-          const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (cancelled) {
+            audioStream.getTracks().forEach((track) => track.stop());
+            return;
+          }
           currentAudioStream = audioStream;
           combined = new MediaStream([videoTrack, ...audioStream.getAudioTracks()]);
         } catch {
-          // mic busy/unavailable - this segment just records video-only
+          // A busy or denied microphone must not stop video recording.
         }
-        if (stoppedRef.current) return;
-        recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
-      } catch {
-        return; // unsupported on this device - continuous recording is skipped
-      }
+        if (cancelled) return;
 
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-      recorder.onstop = () => {
-        currentAudioStream?.getTracks().forEach((t) => t.stop());
+        const recorder = new MediaRecorder(combined, {
+          mimeType: 'video/webm',
+          videoBitsPerSecond: 500_000,
+          audioBitsPerSecond: 48_000,
+        });
+        currentRecorder = recorder;
+        recorder.ondataavailable = (event) => {
+          if (event.data.size === 0) return;
+          chunks.push(event.data);
+          bytes += event.data.size;
+          if (bytes >= MAX_SEGMENT_BYTES && recorder.state !== 'inactive') recorder.stop();
+        };
+        recorder.onstop = () => {
+          if (segmentTimer) clearTimeout(segmentTimer);
+          currentAudioStream?.getTracks().forEach((track) => track.stop());
+          currentAudioStream = null;
+          currentRecorder = null;
+          void uploadSegment(new Blob(chunks, { type: 'video/webm' }));
+          if (!cancelled) recordSegment();
+        };
+        recorder.onerror = (event) => {
+          console.error('Erro na gravação 24h', event);
+          if (recorder.state !== 'inactive') recorder.stop();
+        };
+        recorder.start(TIMESLICE_MS);
+        segmentTimer = setTimeout(() => {
+          if (recorder.state !== 'inactive') recorder.stop();
+        }, SEGMENT_MS);
+      } catch (error) {
+        audioStream?.getTracks().forEach((track) => track.stop());
         currentAudioStream = null;
-        uploadSegment(chunks);
-        if (!stoppedRef.current) recordSegment(); // chain the next segment
-      };
-
-      recorder.start();
-      currentRecorder = recorder;
-      segmentTimer = setTimeout(() => {
-        if (recorder.state !== 'inactive') recorder.stop();
-      }, SEGMENT_MS);
+        console.error('Não foi possível iniciar a gravação 24h', error);
+        if (!cancelled) segmentTimer = setTimeout(recordSegment, 5_000);
+      }
     }
 
     recordSegment();
 
     return () => {
-      stoppedRef.current = true;
+      cancelled = true;
       if (segmentTimer) clearTimeout(segmentTimer);
-      if (currentRecorder && currentRecorder.state !== 'inactive') {
-        // Keep the partial segment - on a phone kiosk that reloads often,
-        // dropping it meant footage was routinely lost. onstop still fires
-        // and uploads; stoppedRef stops it chaining a new segment.
-        currentRecorder.stop();
-      }
-      currentAudioStream?.getTracks().forEach((t) => t.stop());
+      if (currentRecorder && currentRecorder.state !== 'inactive') currentRecorder.stop();
+      currentAudioStream?.getTracks().forEach((track) => track.stop());
     };
   }, [enabled, videoRef]);
 }

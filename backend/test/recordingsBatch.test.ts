@@ -79,4 +79,16 @@ describe('recordings batch deletion', () => {
     expect(fs.existsSync(path.join(directory, 'keep.webm'))).toBe(true);
     expect(fs.existsSync(path.join(directory, '.thumbs', 'keep.webm.jpg'))).toBe(true);
   });
+
+  it('accepts a binary WebM upload without base64 expansion', async () => {
+    const payload = Buffer.from('webm-test-payload');
+    const response = await fetch(`${baseUrl}/binary`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'video/webm' },
+      body: payload,
+    });
+    expect(response.status).toBe(201);
+    const { data } = await response.json();
+    expect(fs.readFileSync(path.join(directory, data.filename))).toEqual(payload);
+  });
 });

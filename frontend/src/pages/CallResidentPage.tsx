@@ -6,6 +6,7 @@ import { isSpeechRecognitionSupported } from '../utils/voiceRecognition';
 import { useHoldToTalk } from '../hooks/useHoldToTalk';
 import { HoldToTalkButton } from '../components/HoldToTalkButton';
 import { EventType } from '@shared/types/event';
+import { captureVideoFrameAsBase64 } from '../utils/imageCapture';
 
 // Pure infinite-loop guard, not a UX limit - conversation length is
 // driven by silence/goodbye detection below, not a turn count.
@@ -25,6 +26,7 @@ export function CallResidentPage() {
   const segmentRecorderRef = useRef<MediaRecorder | null>(null);
   const segmentAudioStreamRef = useRef<MediaStream | null>(null);
   const allChunksRef = useRef<Blob[]>([]);
+  const visitorPhotoRef = useRef<string | null>(null);
   const [subtitle, setSubtitle] = useState('Chamando o assistente virtual...');
   const [done, setDone] = useState(false);
   const { state: holdState, showButton, listen, buttonHandlers } = useHoldToTalk();
@@ -79,6 +81,7 @@ export function CallResidentPage() {
         if (videoRef.current) {
           videoRef.current.srcObject = displayStream;
           await videoRef.current.play();
+          try { visitorPhotoRef.current = captureVideoFrameAsBase64(videoRef.current); } catch { /* server can extract a still from video */ }
         }
 
         await startRecordingSegment();
@@ -175,7 +178,7 @@ export function CallResidentPage() {
         const blob = new Blob(allChunksRef.current, { type: 'video/webm' });
         const reader = new FileReader();
         reader.onload = () => {
-          apiService.recordUnrecognizedVisit(reader.result as string).catch(() => {});
+          apiService.recordUnrecognizedVisit(reader.result as string, visitorPhotoRef.current || undefined).catch(() => {});
         };
         reader.readAsDataURL(blob);
       }
