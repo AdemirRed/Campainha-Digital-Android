@@ -25,8 +25,8 @@ while IFS='|' read -r id video_file; do
   test -f "$videos/$video_file" || continue
 
   photo_file="visit-backfill-$id.jpg"
-  if ! ffmpeg -v error -y -ss 2 -i "$videos/$video_file" -frames:v 1 -q:v 3 "$photos/$photo_file"; then
-    ffmpeg -v error -y -ss 0 -i "$videos/$video_file" -frames:v 1 -q:v 3 "$photos/$photo_file" || continue
+  if ! ffmpeg -nostdin -v error -y -ss 2 -i "$videos/$video_file" -frames:v 1 -q:v 3 "$photos/$photo_file"; then
+    ffmpeg -nostdin -v error -y -ss 0 -i "$videos/$video_file" -frames:v 1 -q:v 3 "$photos/$photo_file" || continue
   fi
   test -s "$photos/$photo_file" || continue
   sqlite3 "$database" "UPDATE visits SET photo_path = '$photo_file' WHERE id = $id AND photo_path IS NULL;"
