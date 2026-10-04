@@ -1,0 +1,69 @@
+.doorbell-home {
+  --home-ink: #172733;
+  --home-muted: #52616b;
+  --home-line: #d5dfe3;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-y: auto;
+  background: #eef3f4;
+  color: var(--home-ink);
+  padding: max(22px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+}
+
+.doorbell-home__shell { width: min(100%, 590px); min-height: calc(100dvh - 44px); margin: auto; display: flex; flex-direction: column; }
+.doorbell-home__header, .doorbell-home__footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.doorbell-home__brand { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 750; letter-spacing: -.02em; }
+.doorbell-home__brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: #fff; background: var(--home-ink); font-size: 19px; font-weight: 800; }
+.doorbell-home__availability { display: inline-flex; align-items: center; gap: 8px; color: #36614c; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.doorbell-home__availability span { width: 7px; height: 7px; border-radius: 50%; background: #3e9567; }
+.doorbell-home__availability--error { color: #9b3b31; }
+.doorbell-home__availability--error span { background: #c45546; }
+.doorbell-home__availability--loading { color: #52616b; }
+.doorbell-home__availability--loading span { background: #84949b; }
+.doorbell-home__content { width: 100%; margin: auto 0; padding: 34px 0 42px; }
+.doorbell-home__intro { margin-bottom: 27px; }
+.doorbell-home__intro h1 { margin: 0 0 9px; color: var(--home-ink); text-align: left; font-size: clamp(30px, 7vw, 46px); line-height: 1.07; letter-spacing: -.035em; font-weight: 780; }
+.doorbell-home__intro p { margin: 0; color: var(--home-muted); text-align: left; font-size: clamp(16px, 3vw, 19px); line-height: 1.4; }
+.doorbell-home button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.doorbell-home button:focus-visible { outline: 3px solid #2286ac; outline-offset: 3px; }
+.doorbell-home__primary { display: flex; align-items: center; gap: 17px; width: 100%; min-height: 108px; padding: 19px 23px; border: 0; border-radius: 17px; background: #183b4a; color: #fff; text-align: left; box-shadow: 0 12px 28px rgba(24, 59, 74, .16); transition: transform .16s ease, background .16s ease; }
+.doorbell-home__primary:hover { background: #235568; }
+.doorbell-home__primary:active, .doorbell-home__action:active { transform: scale(.985); }
+.doorbell-home__primary-copy, .doorbell-home__action-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; }
+.doorbell-home__primary-copy strong { font-size: clamp(20px, 4vw, 24px); line-height: 1.1; }
+.doorbell-home__primary-copy small { color: #c9dce2; font-size: 14px; line-height: 1.3; }
+.doorbell-home__divider { display: flex; align-items: center; gap: 14px; margin: 25px 0 16px; color: #62737b; font-size: 12px; font-weight: 700; }
+.doorbell-home__divider::after { content: ''; flex: 1; height: 1px; background: var(--home-line); }
+.doorbell-home__actions { display: grid; gap: 9px; }
+.doorbell-home__action { display: flex; align-items: center; gap: 15px; width: 100%; min-height: 84px; padding: 14px 17px; border: 1px solid var(--home-line); border-radius: 15px; background: #fff; color: var(--home-ink); text-align: left; transition: transform .16s ease, border-color .16s ease, background .16s ease; }
+.doorbell-home__action:hover { background: #f9fcfc; border-color: #aac2c9; }
+.doorbell-home__action-copy strong { font-size: 17px; line-height: 1.2; }
+.doorbell-home__action-copy small { color: var(--home-muted); font-size: 13px; line-height: 1.3; }
+.doorbell-home__action > svg { color: #7a8e98; flex: none; }
+.doorbell-home__footer { padding-top: 14px; border-top: 1px solid var(--home-line); color: var(--home-muted); font-size: 12px; line-height: 1.35; }
+.doorbell-home__footer > span { max-width: 280px; }
+.doorbell-home__footer button { flex: none; min-height: 42px; padding: 8px; border: 0; background: transparent; color: #36566a; font-size: 12px; font-weight: 700; }
+
+@media (max-width: 440px) {
+  .doorbell-home__availability { font-size: 0; }
+  .doorbell-home__availability span { width: 9px; height: 9px; }
+  .doorbell-home__content { padding: 29px 0; }
+  .doorbell-home__primary { min-height: 96px; padding: 15px; }
+  .doorbell-home__action { min-height: 76px; }
+}
+
+@media (max-height: 680px) {
+  .doorbell-home__content { padding: 20px 0; }
+  .doorbell-home__intro { margin-bottom: 19px; }
+  .doorbell-home__divider { margin: 17px 0 12px; }
+  .doorbell-home__action { min-height: 68px; }
+}
+
+@media (hover: none) {
+  .doorbell-home__primary:hover { background: #183b4a; }
+  .doorbell-home__action:hover { background: #fff; border-color: var(--home-line); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .doorbell-home__primary, .doorbell-home__action { transition: none; }
+}

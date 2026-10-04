@@ -43,6 +43,7 @@ body {
 #root {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -50,6 +51,7 @@ body {
 .fullscreen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -532,4 +534,18 @@ html, body {
   position: fixed;
   width: 100%;
   height: 100%;
+}
+
+.standby-screen { gap: 20px; text-align: center; }
+.standby-screen__message { width: min(100%, 560px); margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.standby-screen__symbol { display: grid; place-items: center; width: 72px; height: 72px; border-radius: 21px; background: #183b4a; color: white; font-size: 32px; font-weight: 800; letter-spacing: -.04em; }
+.standby-screen__symbol--scanning { width: 58px; height: 58px; border: 6px solid #d3e4e9; border-top-color: #24566b; border-radius: 50%; background: none; animation: spin 1s linear infinite; }
+.standby-screen__message h1 { margin: 5px 0 0; font-size: clamp(30px, 7vw, 45px); letter-spacing: -.035em; line-height: 1.1; }
+.standby-screen__message p { max-width: 34ch; margin: 0; color: #415866; font-size: clamp(17px, 3vw, 21px); line-height: 1.45; }
+.standby-screen__enter { display: flex; align-items: center; justify-content: space-between; gap: 35px; width: min(100%, 320px); min-height: 64px; margin-top: 13px; padding: 14px 20px; border: 0; border-radius: 14px; background: #183b4a; color: white; font: inherit; font-size: 20px; font-weight: 750; cursor: pointer; touch-action: manipulation; }
+.standby-screen__enter:active { transform: scale(.98); }
+.standby-screen__enter:focus-visible { outline: 3px solid #2286ac; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .standby-screen__symbol--scanning { animation: none; border-color: #24566b; }
 }

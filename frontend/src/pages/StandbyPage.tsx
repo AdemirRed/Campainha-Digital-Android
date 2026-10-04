@@ -562,11 +562,7 @@ export function StandbyPage() {
   // pointed at the door, both helping the camera see in the dark and
   // making the kiosk itself easy to spot at night.
   return (
-    <div
-      className="fullscreen kiosk-bright"
-      style={{ cursor: 'pointer' }}
-      onClick={() => !welcomeName && navigate('/home')}
-    >
+    <div className="fullscreen kiosk-bright standby-screen">
       <div
         style={
           phase === 'dormant'
@@ -606,29 +602,30 @@ export function StandbyPage() {
       </div>
 
       {welcomeName ? (
-        <div style={{ textAlign: 'center' }}>
-          <div className="icon mb-24">👋</div>
+        <div className="standby-screen__message" aria-live="polite">
+          <span className="standby-screen__symbol" aria-hidden="true">✓</span>
           <h1>Bem-vindo, {welcomeName}!</h1>
-          {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
+          {subtitle && <p>{subtitle}</p>}
         </div>
       ) : phase === 'conversing' ? (
-        <div style={{ textAlign: 'center' }}>
-          <div className="icon mb-24">🤖</div>
-          <h1>Assistente virtual</h1>
-          {subtitle && <p style={{ fontSize: '18px' }}>{subtitle}</p>}
+        <div className="standby-screen__message" aria-live="polite">
+          <span className="standby-screen__symbol" aria-hidden="true">•••</span>
+          <h1>Estou ouvindo</h1>
+          {subtitle && <p>{subtitle}</p>}
           <HoldToTalkButton show={showHoldButton} state={holdState} handlers={holdButtonHandlers} />
         </div>
       ) : phase === 'active' ? (
-        <div style={{ textAlign: 'center' }}>
-          <div className="icon mb-24">🔎</div>
-          <p style={{ fontSize: '20px' }}>Reconhecendo... alinhe seu rosto na câmera</p>
+        <div className="standby-screen__message" role="status">
+          <span className="standby-screen__symbol standby-screen__symbol--scanning" aria-hidden="true" />
+          <h1>Um instante</h1>
+          <p>Alinhe seu rosto na câmera para identificação.</p>
         </div>
       ) : (
-        <div className="loading">
-          <div className="icon">👁️</div>
-          <p style={{ fontSize: '24px', color: '#64748b' }}>
-            {cameraError ? 'Toque na tela para continuar' : 'Sistema em espera... (toque para entrar)'}
-          </p>
+        <div className="standby-screen__message">
+          <span className="standby-screen__symbol" aria-hidden="true">C</span>
+          <h1>Bem-vindo</h1>
+          <p>{cameraError ? 'A câmera está indisponível. Você ainda pode chamar o morador ou deixar um recado.' : 'Toque abaixo para chamar o morador, fazer uma entrega ou deixar um recado.'}</p>
+          <button className="standby-screen__enter" onClick={() => navigate('/home')}>Começar <span aria-hidden="true">→</span></button>
         </div>
       )}
     </div>

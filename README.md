@@ -11,7 +11,7 @@ contínua e um assistente de voz com IA que conversa com visitantes desconhecido
   a Web Speech API do WebView).
 - 🧠 **Reconhecimento facial** — identifica moradores cadastrados automaticamente (processado no
   servidor, via `@vladmandic/face-api` + WASM, sem depender de binários nativos do TensorFlow).
-- 🗣️ **Assistente virtual com IA (Ollama Cloud)** — conversa por voz com quem não é reconhecido,
+- 🗣️ **Assistente virtual com IA (OpenAI, com Ollama Cloud de reserva)** — conversa por voz com quem não é reconhecido,
   pergunta o motivo da visita, oferece registrar um recado e responde sobre entregas.
 - 📋 **Recados com contexto** — ao reconhecer um morador, o assistente pergunta se ele quer ouvir
   os recados pendentes; as mensagens salvas guardam a pergunta do assistente junto da resposta do
@@ -35,7 +35,7 @@ contínua e um assistente de voz com IA que conversa com visitantes desconhecido
 │  (Android nativo/kiosk) │──HTTP─▶│  - API REST                    │
 │  - Câmera + microfone   │        │  - sql.js (SQLite em WASM)     │
 │  - TTS nativo           │        │  - Reconhecimento facial       │
-│  - Gravação contínua    │        │  - Integração Ollama Cloud     │
+│  - Gravação contínua    │        │  - OpenAI + backup Ollama      │
 └────────────────────────┘        │  - Armazenamento de mídia      │
                                     └───────────────────────────────┘
 ┌────────────────────────┐                    ▲
@@ -68,10 +68,14 @@ Campainha Digital Android/
 ```bash
 cd backend
 npm install
-cp .env.example .env   # configure OLLAMA_API_KEY, API_TOKEN etc.
+cp .env.example .env   # configure OPENAI_API_KEY, OLLAMA_API_KEY, API_TOKEN etc.
 npm run build
 npm start               # ou via pm2: pm2 start dist/backend/src/bootstrap.js --name campainha-backend
 ```
+
+As chamadas de conversa e resumo usam `gpt-6-luna` no backend. Quando a OpenAI falha ou os
+créditos acabam, o servidor tenta automaticamente o Ollama configurado na VPS. A chave da
+OpenAI deve ficar apenas em `backend/.env` no servidor; nunca em `frontend/.env` ou no APK.
 
 ### Frontend
 

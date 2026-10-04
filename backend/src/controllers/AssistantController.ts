@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { chatWithOllama, ChatMessage } from '../services/OllamaService';
+import { ChatMessage } from '../services/OllamaService';
+import { chatWithAI } from '../services/AIService';
 import { transcribeAudio } from '../services/TranscriptionService';
 import { EventRepository } from '../database/repositories/EventRepository';
 import { SettingsRepository } from '../database/repositories/SettingsRepository';
@@ -116,8 +117,10 @@ export class AssistantController {
     try {
       const { messages } = req.body as { messages: ChatMessage[] };
 
-      if (!Array.isArray(messages) || messages.length === 0) {
-        res.status(400).json({ success: false, error: 'messages array is required' } as ApiResponse);
+      if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20 ||
+          messages.some((m) => !m || !['user', 'assistant'].includes(m.role) ||
+            typeof m.content !== 'string' || !m.content.trim() || m.content.length > 2000)) {
+        res.status(400).json({ success: false, error: 'Histórico de conversa inválido ou muito longo' } as ApiResponse);
         return;
       }
 
@@ -137,7 +140,7 @@ export class AssistantController {
         .filter(Boolean)
         .join('\n\n');
 
-      const reply = await chatWithOllama([{ role: 'system', content: systemPrompt }, ...messages]);
+      const reply = await chatWithAI([{ role: 'system', content: systemPrompt }, ...messages]);
 
       res.json({ success: true, data: { reply } } as ApiResponse);
     } catch (error: any) {
@@ -190,7 +193,7 @@ export class AssistantController {
 
       let text: string;
       try {
-        text = await chatWithOllama([
+        text = await chatWithAI([
           {
             role: 'system',
             content: `Você é o assistente de uma campainha inteligente, dando um resumo curto e falado
@@ -203,7 +206,7 @@ export class AssistantController {
 não reconhecida(s)${lastUnrecognizedLocalTime ? `, a última às ${lastUnrecognizedLocalTime} (horário de Brasília)` : ''}.
 Se os dois números forem zero, apenas dê boas-vindas.`,
           },
-        ]);
+        ], 100);
       } catch {
         // Fall back to a plain templated sentence if the LLM call fails -
         // the resident should still hear something useful.

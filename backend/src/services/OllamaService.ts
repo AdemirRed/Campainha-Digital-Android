@@ -5,31 +5,31 @@ export interface ChatMessage {
   content: string;
 }
 
-const BASE_URL = process.env.OLLAMA_BASE_URL || 'https://ollama.com';
-const API_KEY = process.env.OLLAMA_API_KEY || '';
-const MODEL = process.env.OLLAMA_MODEL || 'llama3';
-
 export async function chatWithOllama(messages: ChatMessage[]): Promise<string> {
-  if (!API_KEY) {
+  const baseUrl = process.env.OLLAMA_BASE_URL || 'https://ollama.com';
+  const apiKey = process.env.OLLAMA_API_KEY || '';
+  const model = process.env.OLLAMA_MODEL || 'llama3';
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(baseUrl);
+  if (!apiKey && !isLocal) {
     throw new Error('OLLAMA_API_KEY not configured');
   }
 
-  const response = await fetch(`${BASE_URL}/api/chat`, {
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/api/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
+      ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages,
       stream: false,
     }),
+    signal: AbortSignal.timeout(12000),
   });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    logger.error(`Ollama request failed: ${response.status} ${text}`);
+    logger.error(`Ollama request failed: ${response.status}`);
     throw new Error(`Ollama request failed (${response.status})`);
   }
 
