@@ -431,7 +431,18 @@ class ApiService {
   }
 
   async deleteContinuousRecording(filename: string): Promise<void> {
-    await this.request<void>(`/recordings/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    await this.request<void>(`/recordings/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+    });
+  }
+
+  async deleteContinuousRecordings(filenames: string[]): Promise<{ deleted: string[]; failed: string[] }> {
+    return this.request('/recordings/batch', {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${API_TOKEN}` },
+      body: JSON.stringify({ filenames }),
+    });
   }
 
   continuousRecordingUrl(filename: string): string {

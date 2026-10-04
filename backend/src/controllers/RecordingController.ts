@@ -27,7 +27,17 @@ function base64ToBuffer(base64: string): Buffer {
 function isSafeFilename(name: string): boolean {
   // No path separators or traversal - filenames are always our own
   // generated timestamps, this just guards against a malformed request.
-  return /^[\w.-]+$/.test(name);
+  return /^[\w.-]+\.webm$/.test(name);
+}
+
+function removeRecording(filename: string): void {
+  for (const file of [path.join(thumbsPath(), `${filename}.jpg`), path.join(continuousPath(), filename)]) {
+    try {
+      fs.unlinkSync(file);
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
 }
 
 function deleteOlderThanRetention(): void {
@@ -102,15 +112,33 @@ export class RecordingController {
         return;
       }
 
-      const filePath = path.join(continuousPath(), filename);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      const thumb = path.join(thumbsPath(), `${filename}.jpg`);
-      if (fs.existsSync(thumb)) fs.unlinkSync(thumb);
+      removeRecording(filename);
 
       res.json({ success: true, message: 'Recording deleted' } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message } as ApiResponse);
     }
+  }
+
+  async deleteBatch(req: Request, res: Response): Promise<void> {
+    const { filenames } = req.body || {};
+    if (!Array.isArray(filenames) || filenames.length === 0 || filenames.length > 5000 ||
+        !filenames.every((name) => typeof name === 'string' && isSafeFilename(name))) {
+      res.status(400).json({ success: false, error: 'Provide 1 to 5000 valid recording filenames' } as ApiResponse);
+      return;
+    }
+
+    const deleted: string[] = [];
+    const failed: string[] = [];
+    for (const filename of new Set<string>(filenames)) {
+      try {
+        removeRecording(filename);
+        deleted.push(filename);
+      } catch {
+        failed.push(filename);
+      }
+    }
+    res.json({ success: true, data: { deleted, failed } } as ApiResponse);
   }
 
   // One small JPEG poster per clip, generated on first request and cached
