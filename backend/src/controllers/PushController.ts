@@ -8,6 +8,7 @@ import { PushSubscriptionRepository } from '../database/repositories/PushSubscri
 import { getVapidPublicKey, pushToAllDevices } from '../services/PushService';
 import { broadcastIncomingCall, callSignalingIdFor, getResidentsOnlineCount } from '../services/CallSignalingService';
 import { ApiResponse } from '@shared/types/api';
+import { pushPersonMoment } from '../services/PersonDetectionService';
 
 // One "pessoa na câmera" alert per minute at most - someone standing at
 // the door keeps getting detected and must not spam the resident's phone.
@@ -77,12 +78,10 @@ export class PushController {
         metadata: { photo_path: photoPath, name: known, doorbellId: Number(req.body?.doorbellId) || 1 },
       });
 
-      await pushToAllDevices({
-        type: 'person-seen',
-        title: known ? `👤 ${known} na porta` : '👤 Pessoa na câmera',
-        body: 'Toque para ver o momento',
-        photo: photoPath ? `/storage/photos/${photoPath}` : undefined,
-        url: `/admin/residents?tab=recordings&at=${encodeURIComponent(new Date(now).toISOString())}`,
+      await pushPersonMoment({
+        title: known ? `👤 ${known} na porta` : '👤 Pessoa na porta',
+        photoPath,
+        atIso: new Date(now).toISOString(),
       });
 
       res.json({ success: true, data: { throttled: false } } as ApiResponse);

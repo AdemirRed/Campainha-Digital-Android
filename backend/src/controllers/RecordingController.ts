@@ -4,6 +4,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { ApiResponse } from '@shared/types/api';
+import { enqueuePersonScan } from '../services/PersonDetectionService';
 
 const execFileP = promisify(execFile);
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
@@ -67,6 +68,7 @@ export class RecordingController {
       const filename = `${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
       fs.writeFileSync(path.join(continuousPath(), filename), req.body);
       deleteOlderThanRetention();
+      enqueuePersonScan(filename);
       res.status(201).json({ success: true, data: { filename } } as ApiResponse);
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message } as ApiResponse);
@@ -88,6 +90,7 @@ export class RecordingController {
       // Sweep old chunks on every upload instead of running a separate
       // scheduled job - simple and good enough for this volume.
       deleteOlderThanRetention();
+      enqueuePersonScan(filename);
 
       res.status(201).json({ success: true, data: { filename } } as ApiResponse);
     } catch (error: any) {

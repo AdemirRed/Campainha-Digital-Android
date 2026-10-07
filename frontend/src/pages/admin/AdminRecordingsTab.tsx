@@ -105,6 +105,8 @@ interface Moment {
   name: string | null;
   photo: string | null;
   kind: 'person' | 'resident';
+  clip?: string; // set by the server-side clip scanner
+  offsetSec?: number; // second inside that clip where the person shows up
 }
 
 // Clip files are named/stamped when the segment is UPLOADED, i.e. at its
@@ -122,7 +124,7 @@ function clipCovering(recordings: Recording[], atIso: string): Recording | null 
 // Plays the clip around a moment, seeking to a few seconds before it when
 // the browser knows the clip's duration (MediaRecorder WebM sometimes
 // doesn't - then it just plays from the start).
-function MomentPlayer({ rec, atIso }: { rec: Recording; atIso: string }) {
+function MomentPlayer({ rec, atIso, offsetSec }: { rec: Recording; atIso: string; offsetSec?: number }) {
   const secondsBeforeEnd = (new Date(rec.createdAt).getTime() - new Date(atIso).getTime()) / 1000;
   return (
     <video
@@ -132,7 +134,10 @@ function MomentPlayer({ rec, atIso }: { rec: Recording; atIso: string }) {
       src={apiService.continuousRecordingUrl(rec.filename)}
       onLoadedMetadata={(e) => {
         const v = e.currentTarget;
-        if (Number.isFinite(v.duration) && v.duration > 0) {
+        if (typeof offsetSec === 'number') {
+          // Exact second from the server-side detector.
+          v.currentTime = Math.max(0, offsetSec - 2);
+        } else if (Number.isFinite(v.duration) && v.duration > 0) {
           v.currentTime = Math.max(0, v.duration - secondsBeforeEnd - 3);
         }
       }}
@@ -172,23 +177,30 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
 
   async function loadMoments() {
     try {
-      const { items } = await apiService.getEvents(1, 300);
+      const { items } = await apiService.getEvents(1, 500);
       const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
       const list: Moment[] = [];
       for (const ev of items as any[]) {
         if (ev.type !== 'person_detected' && ev.type !== 'resident_identified') continue;
         // SQLite CURRENT_TIMESTAMP is UTC without a zone marker.
-        const at = new Date(String(ev.created_at).replace(' ', 'T') + (String(ev.created_at).endsWith('Z') ? '' : 'Z'));
-        if (at.getTime() < weekAgo) continue;
         const md = ev.metadata || {};
+        // The clip scanner stores the real moment (it runs after upload);
+        // otherwise SQLite CURRENT_TIMESTAMP is UTC without a zone marker.
+        const at = md.at
+          ? new Date(md.at)
+          : new Date(String(ev.created_at).replace(' ', 'T') + (String(ev.created_at).endsWith('Z') ? '' : 'Z'));
+        if (at.getTime() < weekAgo) continue;
         list.push({
           id: ev.id,
           at: at.toISOString(),
           name: md.name || md.residentName || null,
           photo: md.photo_path || null,
           kind: ev.type === 'resident_identified' ? 'resident' : 'person',
+          clip: md.clip,
+          offsetSec: typeof md.offsetSec === 'number' ? md.offsetSec : undefined,
         });
       }
+      list.sort((a, b) => b.at.localeCompare(a.at));
       setMoments(list);
     } catch {
       // moments are a bonus - the clip list still works without them
@@ -203,7 +215,12 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recordings]);
 
-  const openClip = openMoment ? clipCovering(recordings, openMoment.at) : null;
+  const openClip = openMoment
+    ? (openMoment.clip && recordings.find((r) => r.filename === openMoment.clip)) || clipCovering(recordings, openMoment.at)
+    : null;
+  // Clips where the detector saw someone - badge + "só com pessoas" filter.
+  const clipsWithPeople = useMemo(() => new Set(moments.map((m) => m.clip).filter(Boolean) as string[]), [moments]);
+  const [onlyPeople, setOnlyPeople] = useState(false);
 
   const byDay = useMemo(() => {
     const groups: Record<string, Recording[]> = {};
@@ -337,7 +354,12 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
             <button className="admin-btn" onClick={() => setOpenMoment(null)}>✕ Fechar</button>
           </div>
           {openClip ? (
-            <MomentPlayer key={`${openClip.filename}-${openMoment.at}`} rec={openClip} atIso={openMoment.at} />
+            <MomentPlayer
+              key={`${openClip.filename}-${openMoment.at}`}
+              rec={openClip}
+              atIso={openMoment.at}
+              offsetSec={openMoment.clip === openClip.filename ? openMoment.offsetSec : undefined}
+            />
           ) : (
             <p style={{ color: '#64748b', fontSize: 14 }}>
               Ainda não há clipe gravado cobrindo esse horário (pode levar ~2 min para o clipe chegar).
@@ -358,6 +380,14 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
           >
             {selected.size === recordings.length ? 'Desmarcar todos' : `Selecionar todos (${recordings.length})`}
           </button>
+          <button
+            className="admin-btn"
+            onClick={() => setOnlyPeople((v) => !v)}
+            aria-pressed={onlyPeople}
+            style={onlyPeople ? { borderColor: '#22c55e', color: '#22c55e' } : undefined}
+          >
+            👤 {onlyPeople ? 'Mostrando só com pessoas' : `Só com pessoas (${clipsWithPeople.size})`}
+          </button>
           {selected.size > 0 && (
             <>
               <span className="admin-recordings-count">{selected.size} selecionado{selected.size === 1 ? '' : 's'} · {formatBytes(selectedSize)}</span>
@@ -372,7 +402,13 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
         </div>
       )}
 
-      {byDay.map(([day, dayRecordings]) => (
+      {byDay.map(([day, allDayRecordings]) => {
+        const dayRecordings = onlyPeople
+          ? allDayRecordings.filter((rec) => clipsWithPeople.has(rec.filename))
+          : allDayRecordings;
+        if (dayRecordings.length === 0) return null;
+        const withPeople = allDayRecordings.filter((rec) => clipsWithPeople.has(rec.filename)).length;
+        return (
         <div key={day} className="admin-recordings-day">
           <div className="admin-recordings-day-header">
             <DayCheckbox
@@ -389,7 +425,7 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
             >
               {new Date(`${day}T00:00:00`).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })}
               {' — '}
-              {dayRecordings.length} clipe(s) {expandedDay === day ? '▲' : '▼'}
+              {dayRecordings.length} clipe(s){withPeople > 0 ? ` · 👤 ${withPeople} com pessoas` : ''} {expandedDay === day ? '▲' : '▼'}
             </button>
           </div>
 
@@ -405,7 +441,10 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
                       disabled={deletingBatch || !!deletingFile}
                       onChange={(event) => selectRecordings([rec.filename], event.target.checked)}
                     />
-                    <span>{new Date(rec.createdAt).toLocaleTimeString('pt-BR')} · {formatBytes(rec.size)}</span>
+                    <span>
+                      {clipsWithPeople.has(rec.filename) && <span title="Pessoa detectada">👤 </span>}
+                      {new Date(rec.createdAt).toLocaleTimeString('pt-BR')} · {formatBytes(rec.size)}
+                    </span>
                   </label>
                   <RecordingPlayer filename={rec.filename} />
                   <button
@@ -421,7 +460,8 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

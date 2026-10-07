@@ -1,4 +1,5 @@
 import './loadEnv';
+import { startPersonBackfill } from './services/PersonDetectionService';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -121,6 +122,7 @@ async function startServer() {
   server.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    startPersonBackfill();
   });
 
   // Graceful shutdown
