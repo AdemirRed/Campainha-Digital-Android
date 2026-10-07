@@ -184,6 +184,8 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
         if (ev.type !== 'person_detected' && ev.type !== 'resident_identified') continue;
         // SQLite CURRENT_TIMESTAMP is UTC without a zone marker.
         const md = ev.metadata || {};
+        // Legacy motion-only events carry nothing to look at - skip them.
+        if (ev.type === 'person_detected' && !md.photo_path && !md.clip) continue;
         // The clip scanner stores the real moment (it runs after upload);
         // otherwise SQLite CURRENT_TIMESTAMP is UTC without a zone marker.
         const at = md.at
