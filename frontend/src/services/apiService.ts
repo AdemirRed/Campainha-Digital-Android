@@ -155,6 +155,14 @@ class ApiService {
     });
   }
 
+  // Kiosk -> "someone is on camera" alert (server throttles to 1/min).
+  async notifyPersonSeen(photoBase64?: string, name?: string): Promise<void> {
+    await this.request('/push/person-seen', {
+      method: 'POST',
+      body: JSON.stringify({ photoBase64, name, doorbellId: kioskDoorbellId() }),
+    });
+  }
+
   async getCallPresence(): Promise<{ residentsOnline: number }> {
     return this.request('/push/presence');
   }

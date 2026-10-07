@@ -503,11 +503,17 @@ export function StandbyPage() {
             faceStreak++;
             setFaceBox(scan.box);
             if (faceStreak >= 2) {
+              if (!sawFace) {
+                // "Momento importante": alert the resident's phone right
+                // away - the visitor may just walk past without talking.
+                apiService.notifyPersonSeen(base64).catch(() => {});
+              }
               sawFace = true;
               if (!visitorPhotoRef.current) visitorPhotoRef.current = base64;
             }
             if (scan.resident) {
               matched = { resident: scan.resident, isAdmin: scan.isAdmin };
+              if (!sawFace) apiService.notifyPersonSeen(base64, scan.resident.name).catch(() => {});
               break;
             }
           } else {

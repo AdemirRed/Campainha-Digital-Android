@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { apiService } from '../../services/apiService';
+import { apiService, STORAGE_BASE_URL } from '../../services/apiService';
 
 interface Recording {
   filename: string;
@@ -99,7 +99,51 @@ function RecordingPlayer({ filename }: { filename: string }) {
   );
 }
 
+interface Moment {
+  id: number;
+  at: string; // ISO
+  name: string | null;
+  photo: string | null;
+  kind: 'person' | 'resident';
+}
+
+// Clip files are named/stamped when the segment is UPLOADED, i.e. at its
+// end - so the clip covering moment T is the first one stamped at/after T.
+function clipCovering(recordings: Recording[], atIso: string): Recording | null {
+  const t = new Date(atIso).getTime();
+  let best: Recording | null = null;
+  for (const rec of recordings) {
+    const end = new Date(rec.createdAt).getTime();
+    if (end >= t && end - t < 6 * 60_000 && (!best || end < new Date(best.createdAt).getTime())) best = rec;
+  }
+  return best;
+}
+
+// Plays the clip around a moment, seeking to a few seconds before it when
+// the browser knows the clip's duration (MediaRecorder WebM sometimes
+// doesn't - then it just plays from the start).
+function MomentPlayer({ rec, atIso }: { rec: Recording; atIso: string }) {
+  const secondsBeforeEnd = (new Date(rec.createdAt).getTime() - new Date(atIso).getTime()) / 1000;
+  return (
+    <video
+      controls
+      autoPlay
+      preload="auto"
+      src={apiService.continuousRecordingUrl(rec.filename)}
+      onLoadedMetadata={(e) => {
+        const v = e.currentTarget;
+        if (Number.isFinite(v.duration) && v.duration > 0) {
+          v.currentTime = Math.max(0, v.duration - secondsBeforeEnd - 3);
+        }
+      }}
+      style={{ width: '100%', maxWidth: 640, borderRadius: 8, background: '#000' }}
+    />
+  );
+}
+
 export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const [moments, setMoments] = useState<Moment[]>([]);
+  const [openMoment, setOpenMoment] = useState<Moment | null>(null);
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(false);
   const [deletingFile, setDeletingFile] = useState<string | null>(null);
@@ -123,7 +167,43 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
 
   useEffect(() => {
     load();
+    loadMoments();
   }, []);
+
+  async function loadMoments() {
+    try {
+      const { items } = await apiService.getEvents(1, 300);
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+      const list: Moment[] = [];
+      for (const ev of items as any[]) {
+        if (ev.type !== 'person_detected' && ev.type !== 'resident_identified') continue;
+        // SQLite CURRENT_TIMESTAMP is UTC without a zone marker.
+        const at = new Date(String(ev.created_at).replace(' ', 'T') + (String(ev.created_at).endsWith('Z') ? '' : 'Z'));
+        if (at.getTime() < weekAgo) continue;
+        const md = ev.metadata || {};
+        list.push({
+          id: ev.id,
+          at: at.toISOString(),
+          name: md.name || md.residentName || null,
+          photo: md.photo_path || null,
+          kind: ev.type === 'resident_identified' ? 'resident' : 'person',
+        });
+      }
+      setMoments(list);
+    } catch {
+      // moments are a bonus - the clip list still works without them
+    }
+  }
+
+  // Deep link from the push notification: ?tab=recordings&at=<iso>
+  useEffect(() => {
+    const at = new URLSearchParams(window.location.search).get('at');
+    if (!at || recordings.length === 0 || openMoment) return;
+    setOpenMoment({ id: -1, at, name: null, photo: null, kind: 'person' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordings]);
+
+  const openClip = openMoment ? clipCovering(recordings, openMoment.at) : null;
 
   const byDay = useMemo(() => {
     const groups: Record<string, Recording[]> = {};
@@ -201,6 +281,70 @@ export function AdminRecordingsTab({ showToast }: { showToast: (msg: string, typ
         Clipes gravados continuamente. Os mais antigos que 7 dias são apagados
         automaticamente.
       </p>
+
+      <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>⭐ Momentos importantes</h3>
+      {moments.length === 0 ? (
+        <p style={{ color: '#64748b', fontSize: 14, marginBottom: 16 }}>
+          Nenhuma pessoa detectada na câmera nos últimos 7 dias.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8, marginBottom: 12 }}>
+          {moments.map((m) => {
+            const active = openMoment?.id === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setOpenMoment(active ? null : m)}
+                className="admin-card"
+                style={{
+                  flex: '0 0 140px',
+                  padding: 6,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  border: active ? '2px solid #22c55e' : undefined,
+                }}
+              >
+                {m.photo ? (
+                  <img
+                    src={`${STORAGE_BASE_URL}/storage/photos/${m.photo}`}
+                    alt=""
+                    loading="lazy"
+                    style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover', borderRadius: 6, display: 'block' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '4 / 3', borderRadius: 6, background: '#000', display: 'grid', placeItems: 'center', fontSize: 28 }}>
+                    {m.kind === 'resident' ? '🏠' : '👤'}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, marginTop: 4, color: 'var(--text-light)' }}>
+                  {m.name || (m.kind === 'resident' ? 'Morador' : 'Pessoa')}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>
+                  {new Date(m.at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {openMoment && (
+        <div className="admin-card" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <strong>
+              Momento de {new Date(openMoment.at).toLocaleString('pt-BR')}
+            </strong>
+            <button className="admin-btn" onClick={() => setOpenMoment(null)}>✕ Fechar</button>
+          </div>
+          {openClip ? (
+            <MomentPlayer key={`${openClip.filename}-${openMoment.at}`} rec={openClip} atIso={openMoment.at} />
+          ) : (
+            <p style={{ color: '#64748b', fontSize: 14 }}>
+              Ainda não há clipe gravado cobrindo esse horário (pode levar ~2 min para o clipe chegar).
+            </p>
+          )}
+        </div>
+      )}
 
       {loading && <p>Carregando...</p>}
       {!loading && byDay.length === 0 && <p>Nenhuma gravação ainda.</p>}

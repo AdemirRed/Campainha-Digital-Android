@@ -35,7 +35,11 @@ export function AdminResidentsPage() {
   const [unlocked, setUnlocked] = useState(recognizedAdmin);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('residents');
+  const [tab, setTab] = useState<Tab>(() => {
+    // Deep link from a "pessoa na câmera" notification: ?tab=recordings&at=...
+    const fromUrl = new URLSearchParams(location.search).get('tab');
+    return TABS.some((t) => t.key === fromUrl) ? (fromUrl as Tab) : 'residents';
+  });
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {

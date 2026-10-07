@@ -11,11 +11,36 @@ self.addEventListener('activate', () => self.clients.claim());
 // This is what rings the resident's device even with the tab closed -
 // the backend sends this payload via Web Push when the kiosk places a call.
 self.addEventListener('push', (event) => {
-  let data: { type?: string; callId?: string; callerLabel?: string } = {};
+  let data: {
+    type?: string;
+    callId?: string;
+    callerLabel?: string;
+    title?: string;
+    body?: string;
+    photo?: string;
+    url?: string;
+  } = {};
   try {
     data = event.data?.json() || {};
   } catch {
     // non-JSON payload - ignore
+  }
+
+  // "Momento importante": someone showed up on the doorbell camera.
+  if (data.type === 'person-seen') {
+    event.waitUntil(
+      self.registration.showNotification(data.title || '👤 Pessoa na câmera', {
+        body: data.body || 'Toque para ver o momento',
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
+        tag: 'person-seen',
+        // @ts-expect-error - image/renotify are valid at runtime, missing from lib.dom types
+        image: data.photo,
+        renotify: true,
+        data: { url: data.url || '/admin/recordings' },
+      })
+    );
+    return;
   }
 
   if (data.type !== 'incoming-call') return;

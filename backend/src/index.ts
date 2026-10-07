@@ -45,7 +45,18 @@ async function startServer() {
     origin: true,
     credentials: true
   }));
-  app.use(express.json({ limit: '25mb' })); // base64 photos/audio/short video clips
+  // base64 photos/audio/short video clips. The legacy 24h-recording upload
+  // (POST /api/recordings, base64 JSON) gets a much bigger ceiling: kiosks
+  // still running an old cached bundle send whole segments that way, and a
+  // bright daytime segment blew past 25mb -> every daylight clip was
+  // rejected ("request entity too large") and only dark night clips saved.
+  const jsonDefault = express.json({ limit: '25mb' });
+  const jsonRecordings = express.json({ limit: '200mb' });
+  app.use((req, res, next) =>
+    req.method === 'POST' && req.path === '/api/recordings'
+      ? jsonRecordings(req, res, next)
+      : jsonDefault(req, res, next)
+  );
   app.use(express.urlencoded({ extended: true }));
 
   // Setup custom middleware

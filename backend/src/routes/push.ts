@@ -9,6 +9,7 @@ export function createPushRouter(): Router {
   router.post('/subscribe', controller.subscribe.bind(controller));
   router.post('/unsubscribe', controller.unsubscribe.bind(controller));
   router.post('/ring', controller.ring.bind(controller));
+  router.post('/person-seen', controller.personSeen.bind(controller));
   router.get('/presence', controller.presence.bind(controller));
 
   return router;

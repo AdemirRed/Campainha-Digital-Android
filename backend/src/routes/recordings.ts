@@ -6,7 +6,7 @@ export function createRecordingsRouter(): Router {
   const router = Router();
   const recordingController = new RecordingController();
 
-  router.post('/binary', raw({ type: 'video/webm', limit: '20mb' }), recordingController.uploadBinary.bind(recordingController));
+  router.post('/binary', raw({ type: 'video/webm', limit: '150mb' }), recordingController.uploadBinary.bind(recordingController));
   router.post('/', recordingController.upload.bind(recordingController));
   router.get('/', recordingController.list.bind(recordingController));
   router.get('/:filename/thumb', recordingController.thumbnail.bind(recordingController));
